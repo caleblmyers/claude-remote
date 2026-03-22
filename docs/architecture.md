@@ -24,11 +24,41 @@
 - Phone and desktop always reachable to each other
 - When you move to a dedicated server, just add it to the Tailscale network — nothing else changes
 
+**How it works:**
+Tailscale is a mesh VPN built on WireGuard. It's not a server you run — it creates a private encrypted network between your devices. Both devices sign in to the same Tailscale account, each gets a stable private IP (e.g., `100.x.x.x`), and they can talk directly to each other over an encrypted peer-to-peer tunnel. Traffic never passes through Tailscale's servers (unless direct connection fails, in which case encrypted DERP relays are used — still end-to-end encrypted).
+
 **Setup:**
 1. Install Tailscale on desktop and phone
-2. Backend server binds to Tailscale IP (e.g., `100.x.x.x:3000`)
-3. Phone app connects to that IP via HTTPS/WSS
-4. No DNS, no tunnels, no cloud relay
+2. Sign in to the same Tailscale account on both
+3. Backend server binds to Tailscale IP (e.g., `100.x.x.x:3000`)
+4. Phone app connects to that IP
+5. No DNS, no tunnels, no cloud relay
+
+**Port exposure:**
+Tailscale exposes ALL ports on a device by default — it's not port forwarding, it's full network access as if both devices are on the same LAN. This means your phone can reach any port on your desktop, not just 3000.
+
+**Security hardening:**
+1. **Tailscale ACLs** — configure access rules in the Tailscale admin console to restrict your phone to only port 3000 on your desktop. Example ACL:
+   ```json
+   {
+     "acls": [
+       {
+         "action": "accept",
+         "src": ["tag:phone"],
+         "dst": ["tag:desktop:3000"]
+       }
+     ]
+   }
+   ```
+2. **Bind to Tailscale IP only** — set `host` in config to your Tailscale IP instead of `0.0.0.0`. This prevents access from your local network (only Tailscale traffic reaches the backend).
+3. **JWT auth** — even on the private network, all API requests require a valid token. This is a second layer on top of Tailscale's network-level encryption.
+4. **Device approval** — Tailscale requires explicit approval for new devices joining your network. Don't share your tailnet with untrusted devices.
+
+**Trust model:**
+- WireGuard is audited and minimal — considered best-in-class for VPN encryption
+- Tailscale's coordination server sees device metadata (which devices, when online) but never your traffic content
+- If metadata visibility is a concern, self-host the coordination server with [Headscale](https://github.com/juanfont/headscale)
+- No ports are exposed to the public internet — zero internet-facing attack surface
 
 **Future scaling:** If you add a cloud server, it joins the same Tailscale network. The phone connects to whichever machine is running the backend.
 
@@ -182,7 +212,7 @@ interface PermissionRequest {
 
 server:
   port: 3000
-  host: "0.0.0.0"  # bind to Tailscale interface
+  host: "100.x.x.x"  # bind to Tailscale IP only (find via `tailscale ip -4`)
 
 auth:
   secret: "..."     # JWT secret for token auth

@@ -1,0 +1,138 @@
+import type { Task, RepoConfig, RepoTemplate, TrustLevel } from "./types";
+
+const BASE_URL = "/api";
+
+function getToken(): string | null {
+  return localStorage.getItem("claude-remote-token");
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem("claude-remote-token", token);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem("claude-remote-token");
+}
+
+export function hasToken(): boolean {
+  return !!localStorage.getItem("claude-remote-token");
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers,
+    ...options,
+  });
+
+  if (res.status === 401) {
+    clearToken();
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `API ${options?.method ?? "GET"} ${path} failed (${res.status}): ${body}`
+    );
+  }
+
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export interface TaskWithPermissions extends Task {
+  pendingPermissions?: import("./types").PermissionRequest[];
+}
+
+export const api = {
+  tasks: {
+    list: () => request<Task[]>("/tasks"),
+    get: (id: string) => request<TaskWithPermissions>(`/tasks/${id}`),
+    create: (payload: {
+      repo: string;
+      prompt: string;
+      trustLevel?: TrustLevel;
+    }) =>
+      request<Task>("/tasks", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    stop: (id: string) =>
+      request<{ success: boolean }>(`/tasks/${id}/stop`, { method: "POST" }),
+    resume: (id: string, message: string) =>
+      request<{ success: boolean }>(`/tasks/${id}/resume`, {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      }),
+    delete: (id: string) =>
+      request<void>(`/tasks/${id}`, { method: "DELETE" }),
+    approve: (taskId: string, requestId: string) =>
+      request<{ success: boolean }>(`/tasks/${taskId}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ requestId }),
+      }),
+    deny: (taskId: string, requestId: string, reason?: string) =>
+      request<{ success: boolean }>(`/tasks/${taskId}/deny`, {
+        method: "POST",
+        body: JSON.stringify({ requestId, reason }),
+      }),
+    reply: (taskId: string, message: string) =>
+      request<{ success: boolean }>(`/tasks/${taskId}/reply`, {
+        method: "POST",
+        body: JSON.stringify({ message }),
+      }),
+  },
+
+  repos: {
+    list: () => request<RepoConfig[]>("/repos"),
+    templates: (repo?: string) =>
+      request<{ global: RepoTemplate[]; repo: RepoTemplate[] }>(
+        `/templates${repo ? `?repo=${encodeURIComponent(repo)}` : ""}`
+      ),
+  },
+
+  config: {
+    get: () => request<Record<string, unknown>>("/config"),
+    update: (updates: Record<string, unknown>) =>
+      request<Record<string, unknown>>("/config", {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      }),
+  },
+
+  push: {
+    vapidKey: () => request<{ publicKey: string }>("/push/vapid-key"),
+    subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+      request<{ success: boolean }>("/push/subscribe", {
+        method: "POST",
+        body: JSON.stringify(subscription),
+      }),
+  },
+
+  escalate: (taskId: string, tool: string) =>
+    request<{ success: boolean; trustLevel: TrustLevel }>(`/tasks/${taskId}/escalate`, {
+      method: "POST",
+      body: JSON.stringify({ tool }),
+    }),
+
+  auth: {
+    login: (code: string) =>
+      request<{ token: string }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      }),
+  },
+
+  health: {
+    check: () => request<{ status: string; timestamp: string }>("/health"),
+  },
+};

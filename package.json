@@ -1,0 +1,14 @@
+{
+  "name": "claude-remote",
+  "private": true,
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3"]
+  },
+  "scripts": {
+    "dev": "pnpm run dev:backend & pnpm run dev:app & wait",
+    "dev:backend": "pnpm --filter claude-remote-backend run dev",
+    "dev:app": "pnpm --filter app exec vite",
+    "build": "pnpm --filter claude-remote-backend run build && pnpm --filter app run build",
+    "start": "pnpm --filter claude-remote-backend run start"
+  }
+}

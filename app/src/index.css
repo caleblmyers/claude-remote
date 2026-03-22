@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-gray-950 text-gray-100 antialiased;
+  font-family: system-ui, -apple-system, sans-serif;
+  /* Mobile-first: prevent overscroll bounce and ensure full height */
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Monospace output for task streams */
+.font-mono-stream {
+  font-family: "SF Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* Ensure all touch targets meet 44px minimum */
+button, a, [role="button"] {
+  min-height: 44px;
+  min-width: 44px;
+}
