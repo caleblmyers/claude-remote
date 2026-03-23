@@ -105,6 +105,14 @@ export default function HomeScreen() {
         </div>
       )}
 
+      {/* Reconnecting banner */}
+      {(wsStatus === "disconnected" || wsStatus === "error") && (
+        <div className="px-4 py-2 bg-amber-900/80 border-b border-amber-700 flex items-center gap-2">
+          <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-amber-200">Reconnecting...</span>
+        </div>
+      )}
+
       {/* Task list */}
       <main className="flex-1 px-4 py-4 overflow-y-auto">
         {loading && tasks.length === 0 ? (

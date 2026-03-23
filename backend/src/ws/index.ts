@@ -26,14 +26,38 @@ export interface WsMessage {
   [key: string]: unknown;
 }
 
+interface HeartbeatWebSocket extends WebSocket {
+  __pongTimer?: ReturnType<typeof setTimeout>;
+}
+
 // Active WebSocket connections keyed by a simple incrementing id
-const clients = new Map<number, WebSocket>();
+const clients = new Map<number, HeartbeatWebSocket>();
 let nextClientId = 1;
+
+const PING_INTERVAL_MS = 30_000;
+const PONG_TIMEOUT_MS = 10_000;
 
 export function createWsServer(httpServer: Server): WebSocketServer {
   const wss = new WebSocketServer({ server: httpServer });
 
-  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+  // Server-side heartbeat: ping all clients every 30s
+  const pingInterval = setInterval(() => {
+    for (const [clientId, ws] of clients.entries()) {
+      ws.ping();
+      // Terminate if no pong within 10s
+      ws.__pongTimer = setTimeout(() => {
+        console.log(`WebSocket client timed out (id=${clientId})`);
+        ws.terminate();
+        clients.delete(clientId);
+      }, PONG_TIMEOUT_MS);
+    }
+  }, PING_INTERVAL_MS);
+
+  wss.on("close", () => {
+    clearInterval(pingInterval);
+  });
+
+  wss.on("connection", (ws: HeartbeatWebSocket, req: IncomingMessage) => {
     // Validate auth token from query string
     const parsed = url.parse(req.url ?? "", true);
     const token = parsed.query.token as string | undefined;
@@ -47,6 +71,13 @@ export function createWsServer(httpServer: Server): WebSocketServer {
     clients.set(clientId, ws);
     console.log(`WebSocket client connected (id=${clientId})`);
 
+    ws.on("pong", () => {
+      if (ws.__pongTimer) {
+        clearTimeout(ws.__pongTimer);
+        ws.__pongTimer = undefined;
+      }
+    });
+
     ws.on("message", (raw) => {
       try {
         const msg: WsMessage = JSON.parse(raw.toString());
@@ -57,6 +88,7 @@ export function createWsServer(httpServer: Server): WebSocketServer {
     });
 
     ws.on("close", () => {
+      if (ws.__pongTimer) clearTimeout(ws.__pongTimer);
       clients.delete(clientId);
       console.log(`WebSocket client disconnected (id=${clientId})`);
     });

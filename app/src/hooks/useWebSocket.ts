@@ -19,16 +19,29 @@ interface UseWebSocketReturn {
   lastEvent: WsServerEvent | null;
 }
 
+const STALE_TIMEOUT_MS = 45_000;
+
 export function useWebSocket(
   onEvent?: (event: WsServerEvent) => void
 ): UseWebSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const staleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelay = useRef(1000);
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [lastEvent, setLastEvent] = useState<WsServerEvent | null>(null);
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
+
+  const resetStaleTimer = useCallback(() => {
+    if (staleTimer.current) clearTimeout(staleTimer.current);
+    staleTimer.current = setTimeout(() => {
+      // No message received for 45s — connection is stale
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    }, STALE_TIMEOUT_MS);
+  }, []);
 
   const connect = useCallback(() => {
     // Don't connect without a token
@@ -46,9 +59,11 @@ export function useWebSocket(
     ws.onopen = () => {
       setStatus("connected");
       reconnectDelay.current = 1000; // reset backoff
+      resetStaleTimer();
     };
 
     ws.onmessage = (e) => {
+      resetStaleTimer();
       try {
         const event = JSON.parse(e.data as string) as WsServerEvent;
         setLastEvent(event);
@@ -61,6 +76,7 @@ export function useWebSocket(
     ws.onclose = (e) => {
       setStatus("disconnected");
       wsRef.current = null;
+      if (staleTimer.current) clearTimeout(staleTimer.current);
       // Don't reconnect on auth failure
       if (e.code === 4001) return;
       // Exponential backoff: 1s, 2s, 4s, 8s, max 15s
@@ -73,12 +89,13 @@ export function useWebSocket(
       setStatus("error");
       ws.close();
     };
-  }, []);
+  }, [resetStaleTimer]);
 
   useEffect(() => {
     connect();
     return () => {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      if (staleTimer.current) clearTimeout(staleTimer.current);
       wsRef.current?.close();
     };
   }, [connect]);
