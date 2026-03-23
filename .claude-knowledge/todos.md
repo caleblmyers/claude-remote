@@ -12,21 +12,6 @@
 
 ## Work Sets
 
-### S1: Fix Streaming Output
-**Priority:** Critical — app is not useful without this
-**Status:** Pending
-**Files:**
-- `backend/src/agent/index.ts`
-- `app/src/screens/TaskDetail/index.tsx`
-- `app/src/hooks/useTasks.ts`
-- `app/src/lib/types.ts`
-
-**Items:**
-- [ ] Debug SDK message types — check `[sdk]` log output to understand what message types the Agent SDK actually sends
-- [ ] Fix `simplifyStreamEvent()` to handle actual SDK event format (may not be `content_block_delta`/`content_block_start`)
-- [ ] Verify streaming works end-to-end: task created → output streams to phone → completion shown
-- [ ] Remove debug logging (`[sdk]`, `[hook]`) after streaming is confirmed working
-
 ### S2: Persist Stream Output
 **Priority:** High — leaving task detail and returning loses all output
 **Status:** Pending
@@ -44,38 +29,6 @@
 - [ ] Add API endpoint `GET /tasks/:id/events` to fetch saved events
 - [ ] On TaskDetail mount, load saved events from API (not just live WebSocket)
 - [ ] Merge saved events with live WebSocket events (avoid duplicates)
-
-### S3: Push Notifications
-**Priority:** Medium — needed for "approve from lock screen" workflow
-**Status:** Pending
-**Files:**
-- `app/src/hooks/usePushNotifications.ts`
-- `app/public/sw.js`
-- `app/src/screens/Settings/index.tsx`
-- `backend/src/push/index.ts`
-
-**Items:**
-- [ ] Test push notification registration from phone
-- [ ] Test permission request notification delivery
-- [ ] Test notification tap deep-link to task detail
-- [ ] Test task completion notification
-- [ ] Handle notification permission denied gracefully
-
-### S4: Connection Reliability
-**Priority:** Medium — Vite crashes, WebSocket drops
-**Status:** Pending
-**Files:**
-- `app/vite.config.ts`
-- `app/src/hooks/useWebSocket.ts`
-- `app/src/screens/Home/index.tsx`
-- `backend/src/ws/index.ts`
-
-**Items:**
-- [ ] Verify Vite `handleConnectionReset` plugin prevents crashes on phone disconnect
-- [ ] Add connection status indicator to Home screen header (green/yellow/red dot)
-- [ ] Show "Reconnecting..." banner when WebSocket is disconnected
-- [ ] Test WebSocket reconnect after phone sleep/wake cycle
-- [ ] Add heartbeat/ping to detect stale connections
 
 ### S5: Error Handling & UX Polish
 **Priority:** Medium
@@ -99,23 +52,46 @@
 
 Sets that can run in parallel (no file overlap):
 
-| | S1 | S2 | S3 | S4 | S5 |
-|---|---|---|---|---|---|
-| S1 | - | NO | YES | YES | NO |
-| S2 | NO | - | YES | YES | NO |
-| S3 | YES | YES | - | YES | NO |
-| S4 | YES | YES | YES | - | NO |
-| S5 | NO | NO | NO | NO | - |
+| | S2 | S5 |
+|---|---|---|
+| S2 | - | NO |
+| S5 | NO | - |
 
-**Conflict-free combinations:**
-- S1 + S3 + S4 (streaming + push + connection — good first wave)
-- S2 + S3 + S4 (persistence + push + connection — after S1 is done)
+**Note:** S2 and S5 overlap on TaskDetail and other files — run sequentially or carefully split.
 
 ---
 
 ## Completed
 
-_(Nothing completed yet — project is in initial development)_
+### S1: Fix Streaming Output (Wave 1, 2026-03-23)
+- Fixed `simplifyStreamEvent()` to handle real SDK event format
+- Added `tool_input` stream event type for richer tool display
+- Fixed ApprovalCard async `acting` state bug
+- Removed debug logging prefixes, replaced with clean lifecycle logging
+
+### S3: Push Notifications (Wave 1, 2026-03-23)
+- Added notification permission status UI in Settings (granted/denied/default)
+- Added "Test Notification" button and `POST /push/test` endpoint
+- Added VAPID key generation instructions on startup when keys missing
+- Fixed notification deep-links with task-specific URLs
+- Added push unsubscribe endpoint (`DELETE /push/subscribe`) and logout cleanup
+- Fixed notification icon path, added task-specific tags to prevent stacking
+
+### S4: Connection Reliability (Wave 1, 2026-03-23)
+- Added server-side WebSocket heartbeat (30s ping, 10s pong timeout with per-client timer)
+- Added client-side staleness detection (45s no-message threshold)
+- Added "Reconnecting..." banner on Home screen
+- Added visibility-change handling (no reconnects while screen off, immediate reconnect on wake)
+- Added online/offline detection (pause reconnects when offline)
+- Enhanced connection status indicator (green/yellow-pulse/red with labels)
+
+---
+
+## Process Improvements
+
+- [ ] Include `app/src/lib/api.ts` in task file lists when adding new backend API endpoints
+- [ ] Ensure main branch is clean (no uncommitted changes) before spawning swarm worktrees
+- [ ] Workers should verify timing-specific acceptance criteria before marking tasks complete
 
 ---
 

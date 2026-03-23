@@ -4,6 +4,32 @@ Summaries of work completed each session. Most recent first.
 
 ---
 
+## 2026-03-23 — Wave 1 swarm: streaming, push notifications, connection reliability
+
+### S1: Fix Streaming Output
+- Rewrote `simplifyStreamEvent()` to handle actual Agent SDK event format
+- Added `tool_input` stream event type for displaying tool arguments
+- Fixed ApprovalCard `acting` state never resetting after async approval
+- Replaced debug logging with clean task lifecycle logs
+
+### S3: Push Notifications
+- Added notification permission status display in Settings screen
+- Added "Test Notification" button with `POST /push/test` backend endpoint
+- VAPID key generation instructions logged on startup when keys missing
+- Fixed notification payloads to include deep-link URLs (`/tasks/{taskId}`)
+- Added `DELETE /push/subscribe` endpoint for unsubscribe on logout
+- Fixed notification icon path, added task-specific tags
+
+### S4: Connection Reliability
+- Server-side WebSocket heartbeat: 30s ping interval, 10s pong timeout per client
+- Client-side staleness detection: reconnects after 45s with no messages
+- "Reconnecting..." amber banner on Home screen when disconnected
+- Visibility-change aware: pauses reconnects when screen off, immediate reconnect on wake
+- Online/offline detection: pauses reconnects when device has no network
+- Enhanced connection status indicator with animated states
+
+---
+
 ## 2026-03-23 — Trust preset redesign, internal tools, stale task cleanup
 
 - Redesigned trust presets: read-only/edit-freely/full-auto → Observe/Code/Auto
