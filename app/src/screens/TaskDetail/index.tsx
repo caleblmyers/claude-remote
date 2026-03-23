@@ -360,7 +360,11 @@ function ApprovalCard({
 
   const wrap = (fn: () => void) => async () => {
     setActing(true);
-    fn();
+    try {
+      await fn();
+    } finally {
+      setActing(false);
+    }
   };
 
   return (
@@ -433,6 +437,12 @@ function OutputEntry({ entry }: { entry: StreamEvent }) {
         <div className="text-indigo-400 mt-2 mb-1">
           \u25B6 {entry.tool}
         </div>
+      );
+    case "tool_input":
+      return (
+        <span className="text-gray-500 whitespace-pre-wrap">
+          {entry.input}
+        </span>
       );
     case "tool_end":
       return <div className="text-gray-600 mb-1">\u2500\u2500\u2500</div>;
