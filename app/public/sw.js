@@ -65,23 +65,30 @@ self.addEventListener("push", (event) => {
   );
 });
 
-// Notification click: open or focus the app
+// Notification click: open or focus the app and navigate to deep-link
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url ?? "/";
+  const path = event.notification.data?.url ?? "/";
+  const fullUrl = new URL(path, self.location.origin).href;
 
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clients) => {
-        const existing = clients.find((c) => c.url.includes(self.location.origin));
+        // Try to find an existing app window
+        const existing = clients.find((c) =>
+          new URL(c.url).origin === self.location.origin
+        );
         if (existing) {
-          existing.focus();
-          existing.navigate(targetUrl);
-        } else {
-          self.clients.openWindow(targetUrl);
+          return existing.focus().then((focused) => {
+            // Navigate to the deep-link URL
+            if (focused && "navigate" in focused) {
+              return focused.navigate(fullUrl);
+            }
+          });
         }
+        return self.clients.openWindow(fullUrl);
       })
   );
 });

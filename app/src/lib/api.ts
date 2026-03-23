@@ -119,6 +119,11 @@ export const api = {
       }),
     test: () =>
       request<{ sent: number; failed: number }>("/push/test", { method: "POST" }),
+    unsubscribe: (endpoint: string) =>
+      request<{ success: boolean }>("/push/subscribe", {
+        method: "DELETE",
+        body: JSON.stringify({ endpoint }),
+      }),
   },
 
   escalate: (taskId: string, tool: string) =>

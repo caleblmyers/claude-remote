@@ -245,6 +245,16 @@ router.post("/push/subscribe", (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+router.delete("/push/subscribe", (req: Request, res: Response) => {
+  const { endpoint } = req.body as { endpoint?: string };
+  if (!endpoint) {
+    return res.status(400).json({ error: "endpoint is required" });
+  }
+
+  db.deletePushSubscription(endpoint);
+  res.json({ success: true });
+});
+
 // -- Config -------------------------------------------------------------------
 
 router.get("/config", (_req: Request, res: Response) => {

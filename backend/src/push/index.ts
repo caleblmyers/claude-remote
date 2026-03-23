@@ -59,9 +59,9 @@ export async function sendPushToAll(payload: {
   const notifications = config.defaults?.notifications;
 
   // Check notification preferences
-  if (payload.tag === "permission" && notifications && !notifications.onPermission) return;
-  if (payload.tag === "complete" && notifications && !notifications.onComplete) return;
-  if (payload.tag === "error" && notifications && !notifications.onError) return;
+  if (payload.tag?.startsWith("permission") && notifications && !notifications.onPermission) return;
+  if (payload.tag?.startsWith("complete") && notifications && !notifications.onComplete) return;
+  if (payload.tag?.startsWith("error") && notifications && !notifications.onError) return;
 
   const subscriptions = db.listPushSubscriptions();
   if (subscriptions.length === 0) return;
@@ -97,7 +97,7 @@ export async function notifyPermissionRequest(
   await sendPushToAll({
     title: `Approval needed: ${tool}`,
     body: `${repo} — ${summarizeToolAction(tool, input)}`,
-    tag: "permission",
+    tag: `permission-${taskId}`,
     data: { url: `/tasks/${taskId}`, taskId },
   });
 }
@@ -110,7 +110,7 @@ export async function notifyTaskComplete(
   await sendPushToAll({
     title: `Task complete: ${repo}`,
     body: summary.slice(0, 120),
-    tag: "complete",
+    tag: `complete-${taskId}`,
     data: { url: `/tasks/${taskId}`, taskId },
   });
 }
@@ -123,7 +123,7 @@ export async function notifyTaskError(
   await sendPushToAll({
     title: `Task failed: ${repo}`,
     body: error.slice(0, 120),
-    tag: "error",
+    tag: `error-${taskId}`,
     data: { url: `/tasks/${taskId}`, taskId },
   });
 }
