@@ -28,6 +28,7 @@ export function useWebSocket(
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const staleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelay = useRef(1000);
+  const pausedRef = useRef(false);
   const [status, setStatus] = useState<WsStatus>("connecting");
   const [lastEvent, setLastEvent] = useState<WsServerEvent | null>(null);
   const onEventRef = useRef(onEvent);
@@ -43,12 +44,22 @@ export function useWebSocket(
     }, STALE_TIMEOUT_MS);
   }, []);
 
+  const cancelReconnect = useCallback(() => {
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+  }, []);
+
   const connect = useCallback(() => {
     // Don't connect without a token
     if (!localStorage.getItem("claude-remote-token")) {
       setStatus("disconnected");
       return;
     }
+
+    // Don't connect while paused (screen off or offline)
+    if (pausedRef.current) return;
 
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -79,6 +90,8 @@ export function useWebSocket(
       if (staleTimer.current) clearTimeout(staleTimer.current);
       // Don't reconnect on auth failure
       if (e.code === 4001) return;
+      // Don't schedule reconnect if paused
+      if (pausedRef.current) return;
       // Exponential backoff: 1s, 2s, 4s, 8s, max 15s
       const delay = reconnectDelay.current;
       reconnectDelay.current = Math.min(delay * 2, 15000);
@@ -91,14 +104,55 @@ export function useWebSocket(
     };
   }, [resetStaleTimer]);
 
+  // Visibility change: pause reconnects when screen is off, reconnect immediately when on
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        pausedRef.current = true;
+        cancelReconnect();
+      } else {
+        pausedRef.current = false;
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          reconnectDelay.current = 1000;
+          connect();
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [connect, cancelReconnect]);
+
+  // Online/offline: pause when offline, reconnect when online
+  useEffect(() => {
+    const handleOnline = () => {
+      pausedRef.current = false;
+      reconnectDelay.current = 1000;
+      connect();
+    };
+
+    const handleOffline = () => {
+      pausedRef.current = true;
+      cancelReconnect();
+      setStatus("disconnected");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [connect, cancelReconnect]);
+
   useEffect(() => {
     connect();
     return () => {
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      cancelReconnect();
       if (staleTimer.current) clearTimeout(staleTimer.current);
       wsRef.current?.close();
     };
-  }, [connect]);
+  }, [connect, cancelReconnect]);
 
   const send = useCallback((event: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

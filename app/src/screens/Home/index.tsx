@@ -105,8 +105,14 @@ export default function HomeScreen() {
         </div>
       )}
 
-      {/* Reconnecting banner */}
-      {(wsStatus === "disconnected" || wsStatus === "error") && (
+      {/* Reconnecting / Offline banner */}
+      {wsStatus === "disconnected" && !navigator.onLine && (
+        <div className="px-4 py-2 bg-red-900/80 border-b border-red-700 flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+          <span className="text-sm text-red-200">Offline</span>
+        </div>
+      )}
+      {(wsStatus === "disconnected" || wsStatus === "error") && navigator.onLine && (
         <div className="px-4 py-2 bg-amber-900/80 border-b border-amber-700 flex items-center gap-2">
           <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
           <span className="text-sm text-amber-200">Reconnecting...</span>
@@ -259,10 +265,14 @@ function TaskCard({
 }
 
 function ConnectionDot({ status }: { status: WsStatus }) {
+  const isOffline = !navigator.onLine;
+  if (isOffline) {
+    return <span className="w-2.5 h-2.5 rounded-full bg-red-400" />;
+  }
   const colors: Record<WsStatus, string> = {
     connected: "bg-emerald-400",
     connecting: "bg-amber-400 animate-pulse",
-    disconnected: "bg-red-400",
+    disconnected: "bg-amber-400 animate-pulse",
     error: "bg-red-400",
   };
   return <span className={`w-2.5 h-2.5 rounded-full ${colors[status]}`} />;
