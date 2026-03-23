@@ -19,9 +19,15 @@ export function initVapid(): void {
     console.log("VAPID keys configured for push notifications");
   } else {
     console.warn(
-      "No VAPID keys configured. Push notifications are disabled.\n" +
-      "Generate keys with: npx web-push generate-vapid-keys\n" +
-      "Then add them to claude-remote.config.yaml under 'vapid:'"
+      "Push notifications disabled — no VAPID keys configured.\n\n" +
+      "To enable push notifications:\n" +
+      "  1. Generate keys:  npx web-push generate-vapid-keys\n" +
+      "  2. Add to claude-remote.config.yaml:\n" +
+      "     vapid:\n" +
+      "       publicKey: <paste public key>\n" +
+      "       privateKey: <paste private key>\n" +
+      "       mailto: mailto:you@example.com\n" +
+      "  3. Restart the server"
     );
   }
 }
@@ -120,4 +126,45 @@ export async function notifyTaskError(
     tag: "error",
     data: { url: `/tasks/${taskId}`, taskId },
   });
+}
+
+export function isVapidConfigured(): boolean {
+  return vapidConfigured;
+}
+
+export async function sendTestPush(): Promise<{ sent: number; failed: number }> {
+  if (!vapidConfigured) {
+    throw new Error("VAPID keys not configured");
+  }
+
+  const subscriptions = db.listPushSubscriptions();
+  if (subscriptions.length === 0) {
+    throw new Error("No push subscriptions registered");
+  }
+
+  const payload = JSON.stringify({
+    title: "Claude Remote",
+    body: "Test notification — push is working!",
+    tag: "test",
+    data: { url: "/" },
+  });
+
+  let sent = 0;
+  let failed = 0;
+  for (const sub of subscriptions) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: sub.keys },
+        payload
+      );
+      sent++;
+    } catch (err: any) {
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        db.deletePushSubscription(sub.endpoint);
+      }
+      failed++;
+    }
+  }
+
+  return { sent, failed };
 }

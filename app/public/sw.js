@@ -57,8 +57,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title ?? "Claude Remote", {
       body: data.body,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      icon: "/icons/icon-192.svg",
+      badge: "/icons/icon-192.svg",
       data: data.data,
       tag: data.tag ?? "claude-remote",
     })

@@ -111,11 +111,14 @@ export const api = {
 
   push: {
     vapidKey: () => request<{ publicKey: string }>("/push/vapid-key"),
+    status: () => request<{ configured: boolean }>("/push/status"),
     subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
       request<{ success: boolean }>("/push/subscribe", {
         method: "POST",
         body: JSON.stringify(subscription),
       }),
+    test: () =>
+      request<{ sent: number; failed: number }>("/push/test", { method: "POST" }),
   },
 
   escalate: (taskId: string, tool: string) =>

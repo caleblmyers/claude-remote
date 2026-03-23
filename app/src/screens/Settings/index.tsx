@@ -30,6 +30,17 @@ export default function SettingsScreen() {
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplatePrompt, setNewTemplatePrompt] = useState("");
 
+  // Push notification state
+  const [pushSupported] = useState(
+    () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window
+  );
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
+    () => ("Notification" in window ? Notification.permission : "denied")
+  );
+  const [vapidConfigured, setVapidConfigured] = useState<boolean | null>(null);
+  const [testingSend, setTestingSend] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -43,7 +54,33 @@ export default function SettingsScreen() {
         setLoading(false);
       }
     })();
+
+    // Check push notification backend status
+    api.push.status().then(
+      (s) => setVapidConfigured(s.configured),
+      () => setVapidConfigured(false)
+    );
   }, []);
+
+  const requestNotifPermission = async () => {
+    if (!pushSupported) return;
+    const result = await Notification.requestPermission();
+    setNotifPermission(result);
+  };
+
+  const sendTestNotification = async () => {
+    setTestingSend(true);
+    setTestResult(null);
+    try {
+      const result = await api.push.test();
+      setTestResult(`Sent to ${result.sent} device(s)${result.failed ? `, ${result.failed} failed` : ""}`);
+    } catch (err: any) {
+      setTestResult(`Error: ${err.message}`);
+    } finally {
+      setTestingSend(false);
+      setTimeout(() => setTestResult(null), 4000);
+    }
+  };
 
   const save = async (updates: Record<string, unknown>) => {
     setSaving(true);
@@ -284,6 +321,83 @@ export default function SettingsScreen() {
                   </div>
                 ))}
               </div>
+            </section>
+
+            {/* Push Notification Status */}
+            <section>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Push Notifications
+              </h2>
+              <div className="rounded-xl border border-gray-800 divide-y divide-gray-800">
+                {/* Browser support */}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-gray-300">Browser support</span>
+                  <span className={`text-xs ${pushSupported ? "text-emerald-400" : "text-red-400"}`}>
+                    {pushSupported ? "Supported" : "Not supported"}
+                  </span>
+                </div>
+
+                {/* Server VAPID config */}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-gray-300">Server configured</span>
+                  <span className={`text-xs ${
+                    vapidConfigured === null ? "text-gray-500" :
+                    vapidConfigured ? "text-emerald-400" : "text-red-400"
+                  }`}>
+                    {vapidConfigured === null ? "Checking..." : vapidConfigured ? "Yes" : "No (VAPID keys missing)"}
+                  </span>
+                </div>
+
+                {/* Permission status */}
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-gray-300">Permission</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${
+                      notifPermission === "granted" ? "text-emerald-400" :
+                      notifPermission === "denied" ? "text-red-400" :
+                      "text-amber-400"
+                    }`}>
+                      {notifPermission === "granted" ? "Granted" :
+                       notifPermission === "denied" ? "Denied" :
+                       "Not requested"}
+                    </span>
+                    {notifPermission === "default" && pushSupported && (
+                      <button
+                        onClick={requestNotifPermission}
+                        className="text-xs text-indigo-400 hover:text-indigo-300"
+                      >
+                        Enable
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {notifPermission === "denied" && (
+                  <div className="px-4 py-3">
+                    <p className="text-xs text-gray-500">
+                      Notifications were blocked. To re-enable, open your browser's site settings and reset the notification permission.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Test button */}
+              {notifPermission === "granted" && vapidConfigured && (
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    onClick={sendTestNotification}
+                    disabled={testingSend}
+                    className="text-sm px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                  >
+                    {testingSend ? "Sending..." : "Test Notification"}
+                  </button>
+                  {testResult && (
+                    <span className={`text-xs ${testResult.startsWith("Error") ? "text-red-400" : "text-emerald-400"}`}>
+                      {testResult}
+                    </span>
+                  )}
+                </div>
+              )}
             </section>
 
             {/* Templates */}

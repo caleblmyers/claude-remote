@@ -5,7 +5,7 @@ import { getConfig, updateConfig } from "../config";
 import { executeTask, stopTask, replyToTask, isTaskRunning } from "../agent";
 import { issueToken, validateSetupCode } from "../auth";
 import { broadcast } from "../ws";
-import { getVapidPublicKey } from "../push";
+import { getVapidPublicKey, isVapidConfigured, sendTestPush } from "../push";
 
 const router: Router = Router();
 
@@ -216,6 +216,19 @@ router.get("/push/vapid-key", (_req: Request, res: Response) => {
     return res.status(404).json({ error: "VAPID not configured" });
   }
   res.json({ publicKey: key });
+});
+
+router.get("/push/status", (_req: Request, res: Response) => {
+  res.json({ configured: isVapidConfigured() });
+});
+
+router.post("/push/test", async (_req: Request, res: Response) => {
+  try {
+    const result = await sendTestPush();
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 router.post("/push/subscribe", (req: Request, res: Response) => {
