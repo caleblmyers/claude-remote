@@ -21,6 +21,10 @@ import {
 // Track running tasks for abort/stop support
 const runningTasks = new Map<string, AbortController>();
 
+// Track content block types per task for correct tool_end detection
+// Maps taskId -> (contentBlockIndex -> blockType)
+const taskStreamState = new Map<string, Map<number, string>>();
+
 export function isTaskRunning(taskId: string): boolean {
   return runningTasks.has(taskId);
 }
@@ -33,8 +37,26 @@ export function stopTask(taskId: string): boolean {
 }
 
 export function simplifyStreamEvent(
-  event: any
-): { type: string; content?: string; tool?: string } | null {
+  event: any,
+  blockTypes?: Map<number, string>
+): { type: string; content?: string; tool?: string; input?: string } | null {
+  // Track content block types on start
+  if (event.type === "content_block_start") {
+    const index = event.index as number;
+    const blockType = event.content_block?.type as string;
+    if (blockTypes && index !== undefined) {
+      blockTypes.set(index, blockType);
+    }
+
+    // Tool call starting
+    if (blockType === "tool_use") {
+      return { type: "tool_start", tool: event.content_block.name };
+    }
+
+    // Text and thinking blocks start silently (content comes via deltas)
+    return null;
+  }
+
   // Text output
   if (
     event.type === "content_block_delta" &&
@@ -43,17 +65,23 @@ export function simplifyStreamEvent(
     return { type: "text", content: event.delta.text };
   }
 
-  // Tool call starting
+  // Tool input streaming — show tool arguments as they arrive
   if (
-    event.type === "content_block_start" &&
-    event.content_block?.type === "tool_use"
+    event.type === "content_block_delta" &&
+    event.delta?.type === "input_json_delta"
   ) {
-    return { type: "tool_start", tool: event.content_block.name };
+    return { type: "tool_input", input: event.delta.partial_json };
   }
 
-  // Tool call complete
+  // Content block complete — only emit tool_end for tool_use blocks
   if (event.type === "content_block_stop") {
-    return { type: "tool_end" };
+    const index = event.index as number;
+    const blockType = blockTypes?.get(index);
+    if (blockType === "tool_use") {
+      return { type: "tool_end" };
+    }
+    // Text/thinking block stop — no visible event needed
+    return null;
   }
 
   // Message complete (turn done)
@@ -194,7 +222,18 @@ function processMessage(taskId: string, message: SDKMessage): void {
   // Stream events (partial messages) → forward to phone
   if (message.type === "stream_event") {
     const partial = message as SDKPartialAssistantMessage;
-    const simplified = simplifyStreamEvent(partial.event);
+    // Get or create block type tracking for this task
+    if (!taskStreamState.has(taskId)) {
+      taskStreamState.set(taskId, new Map());
+    }
+    const blockTypes = taskStreamState.get(taskId)!;
+
+    // Reset block tracking on message_start (new turn)
+    if (partial.event && (partial.event as any).type === "message_start") {
+      blockTypes.clear();
+    }
+
+    const simplified = simplifyStreamEvent(partial.event, blockTypes);
     if (simplified) {
       broadcast({
         type: "task:stream",
@@ -351,6 +390,7 @@ export async function executeTask(taskId: string): Promise<void> {
     }
   } finally {
     runningTasks.delete(taskId);
+    taskStreamState.delete(taskId);
   }
 }
 
@@ -421,5 +461,6 @@ export async function replyToTask(
     }
   } finally {
     runningTasks.delete(taskId);
+    taskStreamState.delete(taskId);
   }
 }

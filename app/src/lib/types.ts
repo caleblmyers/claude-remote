@@ -63,9 +63,10 @@ export type WsServerEvent =
   | { type: "task:status_change"; taskId?: string; oldStatus?: TaskStatus; newStatus?: TaskStatus; connected?: boolean };
 
 export interface StreamEvent {
-  type: "text" | "tool_start" | "tool_end" | "turn_complete";
+  type: "text" | "tool_start" | "tool_input" | "tool_end" | "turn_complete";
   content?: string;
   tool?: string;
+  input?: string;
 }
 
 // ── Trust level presets ───────────────────────────────────────────────────────
