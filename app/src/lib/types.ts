@@ -72,27 +72,27 @@ export interface StreamEvent {
 // ── Trust level presets ───────────────────────────────────────────────────────
 
 export const TRUST_PRESETS = {
-  "read-only": {
-    label: "Read only",
-    description: "Safest — only browsing, no changes",
+  "observe": {
+    label: "Observe",
+    description: "Read-only — can browse code, can't change anything",
     trustLevel: {
       autoApprove: ["Read", "Grep", "Glob"],
-      alwaysAsk: ["Bash", "Write", "Edit"],
-      deny: [],
+      alwaysAsk: [],
+      deny: ["Bash", "Write", "Edit"],
     },
   },
-  "edit-freely": {
-    label: "Edit freely",
-    description: "Can read and edit files, asks for shell",
+  "code": {
+    label: "Code",
+    description: "Can read and edit files, asks before running commands",
     trustLevel: {
-      autoApprove: ["Read", "Grep", "Glob", "Edit"],
-      alwaysAsk: ["Bash", "Write"],
+      autoApprove: ["Read", "Grep", "Glob", "Edit", "Write"],
+      alwaysAsk: ["Bash"],
       deny: [],
     },
   },
-  "full-auto": {
-    label: "Full auto",
-    description: "Fastest — auto-approves everything",
+  "auto": {
+    label: "Auto",
+    description: "Full autonomy — no approvals needed",
     trustLevel: {
       autoApprove: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"],
       alwaysAsk: [],

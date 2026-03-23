@@ -25,7 +25,7 @@ export default function NewTaskScreen() {
     repo: RepoTemplate[];
   }>({ global: [], repo: [] });
   const [prompt, setPrompt] = useState("");
-  const [trustPreset, setTrustPreset] = useState<TrustPresetKey>("edit-freely");
+  const [trustPreset, setTrustPreset] = useState<TrustPresetKey>("code");
   const [customTools, setCustomTools] = useState<Set<string>>(
     new Set(["Read", "Grep", "Glob"])
   );

@@ -136,7 +136,7 @@ export function updateConfig(updates: Record<string, unknown>): AppConfig {
 
 function defaultConfig(): AppConfig {
   return {
-    server: { port: 3000, host: "0.0.0.0" },
+    server: { port: parseInt(process.env.PORT || '3001'), host: "0.0.0.0" },
     auth: { secret: "change-me-before-use" },
     repos: [],
     globalTemplates: [],

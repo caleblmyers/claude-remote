@@ -138,7 +138,7 @@ export default function SettingsScreen() {
   };
 
   const findPreset = (): TrustPresetKey | "custom" => {
-    if (!defaults) return "read-only";
+    if (!defaults) return "code";
     for (const [key, preset] of Object.entries(TRUST_PRESETS)) {
       if (
         JSON.stringify([...preset.trustLevel.autoApprove].sort()) ===

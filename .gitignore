@@ -8,3 +8,7 @@ dist/
 .DS_Store
 .vite/
 claude-remote.config.yaml
+
+# Swarm runtime artifacts
+.ai/taskswarm/tasks*.json
+.ai/taskswarm/issues.md

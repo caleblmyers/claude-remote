@@ -293,9 +293,14 @@ export default function TaskDetailScreen() {
         ref={outputRef}
         className="flex-1 px-4 py-3 overflow-y-auto font-mono text-xs leading-relaxed"
       >
+        {/* Show the user's prompt as the first entry */}
+        <div className="text-indigo-400 mb-2 pb-2 border-b border-gray-800">
+          &gt; {task.prompt}
+        </div>
+
         {output.length === 0 ? (
-          <p className="text-gray-600">
-            {isActive ? "Waiting for output..." : "No output recorded."}
+          <p className="text-gray-600 animate-pulse">
+            {isActive ? "Running..." : "No output recorded."}
           </p>
         ) : (
           output.map((entry, i) => <OutputEntry key={i} entry={entry} />)
@@ -409,19 +414,23 @@ function ApprovalCard({
 }
 
 function formatToolInput(tool: string, input: Record<string, unknown>): string {
-  if (tool === "Bash" && input.command) {
+  const t = tool.toLowerCase();
+  if (t.includes("bash") && input.command) {
     return `$ ${input.command}`;
   }
-  if (tool === "Edit" && input.file_path) {
+  if (t.includes("edit") && input.file_path) {
     return `Edit: ${input.file_path}`;
   }
-  if (tool === "Write" && input.file_path) {
+  if (t.includes("write") && input.file_path) {
     return `Write: ${input.file_path}`;
   }
-  if (tool === "Read" && input.file_path) {
+  if (t.includes("read") && input.file_path) {
     return `Read: ${input.file_path}`;
   }
-  return `${tool}: ${JSON.stringify(input, null, 2)}`;
+  // Fallback: show tool name and input
+  const entries = Object.entries(input);
+  if (entries.length === 0) return tool;
+  return entries.map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("\n");
 }
 
 function OutputEntry({ entry }: { entry: StreamEvent }) {

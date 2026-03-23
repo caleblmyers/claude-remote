@@ -130,6 +130,18 @@ function createPermissionHook(taskId: string, trustLevel: db.Task["trustLevel"])
     if (input.hook_event_name !== "PreToolUse") return {};
 
     const tool = input.tool_name;
+    console.log(`[hook] PreToolUse: tool=${tool}, input keys=${Object.keys(input.tool_input ?? {}).join(",")}`);
+
+    // Internal Claude Code tools — auto-approve, these aren't user-facing
+    const internalTools = ["TodoWrite", "TodoRead", "KillShell", "BashOutput", "TaskCreate", "TaskUpdate", "TaskGet", "TaskList", "TaskOutput", "TaskStop"];
+    if (internalTools.includes(tool)) {
+      return {
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "allow",
+        },
+      };
+    }
 
     // Check deny list
     if (trustLevel.deny?.includes(tool)) {
@@ -210,6 +222,9 @@ function createPermissionHook(taskId: string, trustLevel: db.Task["trustLevel"])
 }
 
 function processMessage(taskId: string, message: SDKMessage): void {
+  const msg = message as any;
+  console.log(`[sdk] message type=${msg.type} subtype=${msg.subtype ?? ""}`);
+
   // Capture session ID from init
   if (message.type === "system") {
     const sys = message as SDKSystemMessage;
@@ -244,26 +259,8 @@ function processMessage(taskId: string, message: SDKMessage): void {
     return;
   }
 
-  // Full assistant messages — extract content blocks
+  // Full assistant messages — skip, already covered by stream_event deltas
   if (message.type === "assistant") {
-    const assist = message as SDKAssistantMessage;
-    if (assist.message?.content && Array.isArray(assist.message.content)) {
-      for (const block of assist.message.content) {
-        if (block.type === "text") {
-          broadcast({
-            type: "task:stream",
-            taskId,
-            event: { type: "text", content: block.text },
-          });
-        } else if (block.type === "tool_use") {
-          broadcast({
-            type: "task:stream",
-            taskId,
-            event: { type: "tool_start", tool: block.name },
-          });
-        }
-      }
-    }
     return;
   }
 

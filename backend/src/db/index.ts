@@ -63,6 +63,10 @@ export function getDb(): Database.Database {
     const dbPath = path.resolve(process.cwd(), "claude-remote.db");
     _db = new Database(dbPath);
     initSchema(_db);
+    // Clean up stale tasks from previous server runs
+    _db.prepare(
+      "UPDATE tasks SET status = 'stopped', updated_at = ? WHERE status IN ('running', 'waiting_approval', 'queued')"
+    ).run(new Date().toISOString());
   }
   return _db;
 }

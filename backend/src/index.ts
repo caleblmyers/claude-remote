@@ -6,6 +6,14 @@ import { createWsServer } from "./ws";
 import { authMiddleware } from "./auth";
 import { initVapid } from "./push";
 
+// Prevent uncaught errors from crashing the server
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err.message);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled rejection:", err);
+});
+
 const config = loadConfig();
 initVapid();
 
