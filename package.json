@@ -1,6 +1,7 @@
 {
   "name": "claude-remote",
-  "private": true,
+  "description": "Mobile controller for Claude Code. Start tasks, stream output, and handle permission approvals from your phone.",
+  "license": "MIT",
   "pnpm": {
     "onlyBuiltDependencies": ["better-sqlite3"]
   },

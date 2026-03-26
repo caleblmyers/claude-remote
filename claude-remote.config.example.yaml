@@ -1,0 +1,69 @@
+# Claude Remote Configuration
+# Copy this file to claude-remote.config.yaml and fill in your values.
+# The config file is gitignored — your secrets stay local.
+
+server:
+  port: 3000
+  host: "0.0.0.0"
+
+# Auth secret used for JWT token generation.
+# Pick something random: `openssl rand -hex 32`
+auth:
+  secret: "change-me-to-a-random-string"
+
+# VAPID keys for push notifications.
+# Generate with: npx web-push generate-vapid-keys
+vapid:
+  publicKey: "your-vapid-public-key"
+  privateKey: "your-vapid-private-key"
+  mailto: "mailto:you@example.com"
+
+# Repos that Claude can work in.
+# Each repo needs an absolute path on the machine running the backend.
+repos:
+  - name: my-project
+    path: /home/you/projects/my-project
+    templates:
+      - name: Run tests
+        prompt: "Run the test suite and report results"
+        trustLevel:
+          autoApprove: [Read, Bash]
+          alwaysAsk: []
+          deny: []
+
+  - name: another-repo
+    path: /home/you/projects/another-repo
+
+# Templates available across all repos.
+globalTemplates:
+  - name: Run tests
+    prompt: "Run the test suite and fix any failures"
+    trustLevel:
+      autoApprove: [Read, Grep, Glob, Bash]
+      alwaysAsk: [Edit, Write]
+      deny: []
+  - name: Code review
+    prompt: "Review recent changes for bugs, security issues, and style"
+    trustLevel:
+      autoApprove: [Read, Grep, Glob]
+      alwaysAsk: [Bash, Edit, Write]
+      deny: []
+  - name: Commit changes
+    prompt: "Review the changes, write a clear commit message, and commit"
+    trustLevel:
+      autoApprove: [Read, Grep, Glob, Bash]
+      alwaysAsk: []
+      deny: []
+
+# Default trust level for new tasks when no template is selected.
+# Trust presets: "observe" (read-only), "code" (read+edit), "auto" (everything except Bash)
+# Or specify custom per-tool rules:
+defaults:
+  trustLevel:
+    autoApprove: [Read, Grep, Glob, Edit, Write]
+    alwaysAsk: [Bash]
+    deny: []
+  notifications:
+    onComplete: true
+    onError: true
+    onPermission: true
