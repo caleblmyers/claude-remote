@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTasks, applyWsEvent } from "../../hooks/useTasks";
 import { useWebSocket, type WsStatus } from "../../hooks/useWebSocket";
@@ -42,6 +42,14 @@ export default function HomeScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showConnInfo, setShowConnInfo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stopError, setStopError] = useState<string | null>(null);
+
+  // Pull-to-refresh touch tracking
+  const touchStartY = useRef(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const scrollRef = useRef<HTMLElement>(null);
+  const PULL_THRESHOLD = 60;
 
   usePushNotifications();
 
@@ -58,15 +66,50 @@ export default function HomeScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refresh();
-    const data = await api.tasks.list();
-    setTasks(data);
-    setRefreshing(false);
+    setError(null);
+    try {
+      await refresh();
+      const data = await api.tasks.list();
+      setTasks(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to load tasks");
+    } finally {
+      setRefreshing(false);
+      setPullDistance(0);
+    }
   };
 
   const handleStop = async (taskId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    await api.tasks.stop(taskId);
+    setStopError(null);
+    try {
+      await api.tasks.stop(taskId);
+    } catch (err: any) {
+      setStopError(err.message || "Failed to stop task");
+      setTimeout(() => setStopError(null), 4000);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (refreshing) return;
+    const scrollTop = scrollRef.current?.scrollTop ?? 0;
+    if (scrollTop > 0) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 0) {
+      setPullDistance(Math.min(delta, PULL_THRESHOLD * 2));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance >= PULL_THRESHOLD && !refreshing) {
+      handleRefresh();
+    } else {
+      setPullDistance(0);
+    }
   };
 
   const activeTasks = tasks.filter((t) =>
@@ -77,7 +120,7 @@ export default function HomeScreen() {
   );
 
   return (
-    <div className="flex flex-col min-h-dvh bg-gray-950 text-gray-100">
+    <div className="relative flex flex-col min-h-dvh bg-gray-950 text-gray-100">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
         <div className="flex items-center gap-2">
@@ -120,28 +163,60 @@ export default function HomeScreen() {
       )}
 
       {/* Task list */}
-      <main className="flex-1 px-4 py-4 overflow-y-auto">
+      <main
+        ref={scrollRef}
+        className="flex-1 px-4 py-4 overflow-y-auto"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Pull-to-refresh indicator */}
+        {(pullDistance > 0 || refreshing) && (
+          <div
+            className="flex items-center justify-center overflow-hidden transition-[height] duration-200"
+            style={{ height: refreshing ? 40 : pullDistance * 0.5 }}
+          >
+            {refreshing ? (
+              <span className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+            ) : pullDistance >= PULL_THRESHOLD ? (
+              <span className="text-xs text-indigo-400">Release to refresh</span>
+            ) : (
+              <span className="text-xs text-gray-500">Pull to refresh</span>
+            )}
+          </div>
+        )}
+
+        {/* Error banner */}
+        {error && (
+          <div className="mb-3 px-3 py-2 rounded-lg bg-red-900/50 border border-red-800 flex items-center justify-between gap-2">
+            <span className="text-sm text-red-300">{error}</span>
+            <button
+              onClick={handleRefresh}
+              className="text-xs text-red-400 hover:text-red-300 font-medium shrink-0"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {loading && tasks.length === 0 ? (
           <div className="flex flex-col gap-3 mt-4">
             {[1, 2, 3].map((i) => (
               <SkeletonCard key={i} />
             ))}
           </div>
-        ) : tasks.length === 0 ? (
-          <p className="text-gray-500 text-sm text-center mt-16">
-            No tasks yet. Start one below.
-          </p>
+        ) : !loading && tasks.length === 0 && !error ? (
+          <div className="flex flex-col items-center justify-center mt-16 gap-3">
+            <p className="text-gray-500 text-sm">No tasks yet — start one!</p>
+            <button
+              onClick={() => navigate("/new")}
+              className="text-sm text-indigo-400 hover:text-indigo-300"
+            >
+              + New Task
+            </button>
+          </div>
         ) : (
           <>
-            {/* Pull to refresh button */}
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="w-full text-xs text-gray-600 hover:text-gray-400 py-1 mb-3 transition-colors"
-            >
-              {refreshing ? "Refreshing..." : "Pull to refresh"}
-            </button>
-
             {/* Active tasks */}
             {activeTasks.length > 0 && (
               <section className="mb-6">
@@ -182,6 +257,13 @@ export default function HomeScreen() {
           </>
         )}
       </main>
+
+      {/* Stop error toast */}
+      {stopError && (
+        <div className="absolute bottom-20 left-4 right-4 px-4 py-2 rounded-lg bg-red-900/90 border border-red-800 text-sm text-red-200 text-center animate-fade-in">
+          {stopError}
+        </div>
+      )}
 
       {/* New Task button */}
       <footer className="px-4 py-4 border-t border-gray-800">
