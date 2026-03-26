@@ -31,14 +31,19 @@ export default function NewTaskScreen() {
   );
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reposError, setReposError] = useState<string | null>(null);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState(false);
 
-  // Load repos on mount
-  useEffect(() => {
+  const PROMPT_MAX_LENGTH = 10_000;
+
+  const loadRepos = () => {
+    setReposLoading(true);
+    setReposError(null);
     api.repos
       .list()
       .then((r) => {
         setRepos(r);
-        // Handle prefill from retry-with-changes
         if (prefillRepo) {
           const match = r.find((repo) => repo.name === prefillRepo);
           if (match) {
@@ -48,17 +53,27 @@ export default function NewTaskScreen() {
         }
         if (prefillPrompt) setPrompt(prefillPrompt);
       })
-      .catch(console.error)
+      .catch((err: any) => {
+        setReposError(err.message || "Failed to load repos");
+      })
       .finally(() => setReposLoading(false));
+  };
+
+  // Load repos on mount
+  useEffect(() => {
+    loadRepos();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load templates when repo is selected
   useEffect(() => {
     if (!selectedRepo) return;
+    setTemplatesLoading(true);
+    setTemplatesError(false);
     api.repos
       .templates(selectedRepo.name)
       .then(setTemplates)
-      .catch(console.error);
+      .catch(() => setTemplatesError(true))
+      .finally(() => setTemplatesLoading(false));
   }, [selectedRepo]);
 
   const handleRepoSelect = (repo: RepoConfig) => {
@@ -92,8 +107,12 @@ export default function NewTaskScreen() {
     });
   };
 
+  const promptTrimmed = prompt.trim();
+  const promptOverLimit = prompt.length > PROMPT_MAX_LENGTH;
+  const canSubmit = !!selectedRepo && promptTrimmed.length > 0 && !promptOverLimit && !sending;
+
   const handleSend = async () => {
-    if (!selectedRepo || !prompt.trim() || sending) return;
+    if (!canSubmit) return;
     setSending(true);
     setError(null);
 
@@ -150,6 +169,16 @@ export default function NewTaskScreen() {
                   <div className="h-2.5 w-40 bg-gray-800 rounded" />
                 </div>
               ))
+            ) : reposError ? (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <p className="text-sm text-red-400">{reposError}</p>
+                <button
+                  onClick={loadRepos}
+                  className="text-sm text-indigo-400 hover:text-indigo-300 font-medium"
+                >
+                  Retry
+                </button>
+              </div>
             ) : repos.length === 0 ? (
               <p className="text-sm text-gray-600 text-center py-8">
                 No repos configured. Edit claude-remote.config.yaml
@@ -192,11 +221,19 @@ export default function NewTaskScreen() {
 
       <main className="flex-1 px-4 py-6 flex flex-col gap-5">
         {/* Quick action templates */}
-        {allTemplates.length > 0 && (
-          <section>
-            <h2 className="text-sm font-medium text-gray-400 mb-2">
-              Quick actions:
-            </h2>
+        <section>
+          <h2 className="text-sm font-medium text-gray-400 mb-2">
+            Quick actions:
+          </h2>
+          {templatesLoading ? (
+            <div className="flex flex-wrap gap-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-8 w-20 rounded-lg bg-gray-800 animate-pulse" />
+              ))}
+            </div>
+          ) : templatesError ? (
+            <p className="text-xs text-gray-600">Templates unavailable</p>
+          ) : allTemplates.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {allTemplates.map((t) => (
                 <button
@@ -208,8 +245,10 @@ export default function NewTaskScreen() {
                 </button>
               ))}
             </div>
-          </section>
-        )}
+          ) : (
+            <p className="text-xs text-gray-600">No templates configured</p>
+          )}
+        </section>
 
         {/* Trust level selector */}
         <section>
@@ -296,11 +335,22 @@ export default function NewTaskScreen() {
           <h2 className="text-sm font-medium text-gray-400 mb-2">Task</h2>
           <textarea
             value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            className="flex-1 min-h-32 bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-gray-100 placeholder-gray-600 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            onChange={(e) => {
+              setPrompt(e.target.value);
+              if (error) setError(null);
+            }}
+            className={`flex-1 min-h-32 bg-gray-900 border rounded-xl px-4 py-3 text-gray-100 placeholder-gray-600 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+              promptOverLimit ? "border-red-600" : "border-gray-800"
+            }`}
             placeholder="Describe the task..."
             autoFocus={allTemplates.length === 0}
+            maxLength={PROMPT_MAX_LENGTH + 100}
           />
+          <div className={`text-xs mt-1 text-right ${
+            promptOverLimit ? "text-red-400" : prompt.length > PROMPT_MAX_LENGTH * 0.9 ? "text-amber-400" : "text-gray-600"
+          }`}>
+            {prompt.length.toLocaleString()} / {PROMPT_MAX_LENGTH.toLocaleString()}
+          </div>
         </section>
 
         {error && (
@@ -311,7 +361,7 @@ export default function NewTaskScreen() {
       <footer className="px-4 py-4 border-t border-gray-800">
         <button
           onClick={handleSend}
-          disabled={!prompt.trim() || sending}
+          disabled={!canSubmit}
           className="w-full h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending ? "Starting..." : "Send"}
