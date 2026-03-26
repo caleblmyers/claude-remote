@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { v4 as uuidv4 } from "uuid";
 import * as db from "../db";
 import { getConfig, updateConfig } from "../config";
@@ -6,6 +6,8 @@ import { executeTask, stopTask, replyToTask, isTaskRunning } from "../agent";
 import { issueToken, validateSetupCode } from "../auth";
 import { broadcast } from "../ws";
 import { getVapidPublicKey, isVapidConfigured, sendTestPush } from "../push";
+
+const VALID_TRUST_PRESETS = ["observe", "code", "auto"] as const;
 
 const router: Router = Router();
 
@@ -32,14 +34,23 @@ router.get("/tasks/:id", (req: Request, res: Response) => {
 });
 
 router.post("/tasks", (req: Request, res: Response) => {
-  const { repo, prompt, trustLevel } = req.body as {
+  const { repo, prompt, trustLevel, trustPreset } = req.body as {
     repo?: string;
     prompt?: string;
     trustLevel?: db.Task["trustLevel"];
+    trustPreset?: string;
   };
 
   if (!repo || !prompt) {
     return res.status(400).json({ error: "repo and prompt are required" });
+  }
+
+  if (typeof prompt !== "string" || prompt.length < 1 || prompt.length > 10000) {
+    return res.status(400).json({ error: "Prompt must be between 1 and 10000 characters" });
+  }
+
+  if (trustPreset !== undefined && !VALID_TRUST_PRESETS.includes(trustPreset as any)) {
+    return res.status(400).json({ error: `Invalid trust preset. Must be one of: ${VALID_TRUST_PRESETS.join(", ")}` });
   }
 
   const config = getConfig();
@@ -65,6 +76,8 @@ router.post("/tasks", (req: Request, res: Response) => {
   // Kick off agent execution in background (don't await)
   executeTask(task.id).catch((err) => {
     console.error(`Task ${task.id} execution failed:`, err.message);
+    db.updateTask(task.id, { status: "failed", error: err.message });
+    broadcast({ type: "task:error", taskId: task.id, error: err.message });
   });
 
   res.status(201).json(task);
@@ -101,6 +114,8 @@ router.post("/tasks/:id/resume", (req: Request, res: Response) => {
   replyToTask(task.id, message || "Continue where you left off.").catch(
     (err) => {
       console.error(`Resume task ${task.id} failed:`, err.message);
+      db.updateTask(task.id, { status: "failed", error: err.message });
+      broadcast({ type: "task:error", taskId: task.id, error: err.message });
     }
   );
 
@@ -155,6 +170,8 @@ router.post("/tasks/:id/reply", (req: Request, res: Response) => {
 
   replyToTask(task.id, message).catch((err) => {
     console.error(`Reply to task ${task.id} failed:`, err.message);
+    db.updateTask(task.id, { status: "failed", error: err.message });
+    broadcast({ type: "task:error", taskId: task.id, error: err.message });
   });
 
   res.json({ success: true });
@@ -301,6 +318,17 @@ router.post("/auth/login", (req: Request, res: Response) => {
 
   const token = issueToken();
   res.json({ token });
+});
+
+// -- Error Handling Middleware ------------------------------------------------
+
+router.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error("Unhandled API error:", err.message);
+  if (process.env.NODE_ENV === "production") {
+    res.status(500).json({ error: "Internal server error" });
+  } else {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;
