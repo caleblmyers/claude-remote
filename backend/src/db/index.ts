@@ -20,6 +20,14 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface TaskEvent {
+  id: number;
+  taskId: string;
+  eventType: string;
+  data: unknown;
+  createdAt: string;
+}
+
 export interface PermissionRequest {
   id: string;
   taskId: string;
@@ -43,6 +51,14 @@ type TaskRow = {
   error: string | null;
   created_at: string;
   updated_at: string;
+};
+
+type TaskEventRow = {
+  id: number;
+  task_id: string;
+  event_type: string;
+  data: string;
+  created_at: string;
 };
 
 type PermRow = {
@@ -157,6 +173,36 @@ export function updateTask(id: string, updates: Partial<Omit<Task, "id" | "creat
 
 export function deleteTask(id: string): void {
   getDb().prepare("DELETE FROM tasks WHERE id = ?").run(id);
+}
+
+// ── Task Events ──────────────────────────────────────────────────────────────
+
+function rowToTaskEvent(row: TaskEventRow): TaskEvent {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    eventType: row.event_type,
+    data: JSON.parse(row.data),
+    createdAt: row.created_at,
+  };
+}
+
+export function saveTaskEvent(taskId: string, eventType: string, data: string): number {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const result = db.prepare(`
+    INSERT INTO task_events (task_id, event_type, data, created_at)
+    VALUES (?, ?, ?, ?)
+  `).run(taskId, eventType, data, now);
+  return Number(result.lastInsertRowid);
+}
+
+export function listTaskEvents(taskId: string): TaskEvent[] {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT * FROM task_events WHERE task_id = ? ORDER BY id ASC"
+  ).all(taskId) as TaskEventRow[];
+  return rows.map(rowToTaskEvent);
 }
 
 // ── Permission Requests ───────────────────────────────────────────────────────

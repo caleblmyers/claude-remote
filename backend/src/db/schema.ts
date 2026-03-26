@@ -36,6 +36,16 @@ CREATE INDEX IF NOT EXISTS idx_tasks_updated_at   ON tasks(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_perm_task_id       ON permission_requests(task_id);
 CREATE INDEX IF NOT EXISTS idx_perm_status        ON permission_requests(status);
 
+CREATE TABLE IF NOT EXISTS task_events (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id      TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  event_type   TEXT NOT NULL,
+  data         TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_events_task_id ON task_events(task_id);
+
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   endpoint     TEXT NOT NULL UNIQUE,
