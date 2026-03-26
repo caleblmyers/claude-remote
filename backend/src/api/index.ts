@@ -33,6 +33,14 @@ router.get("/tasks/:id", (req: Request, res: Response) => {
   res.json({ ...task, pendingPermissions });
 });
 
+router.get("/tasks/:id/events", (req: Request, res: Response) => {
+  const task = db.getTask(req.params.id);
+  if (!task) return res.status(404).json({ error: "Task not found" });
+
+  const events = db.listTaskEvents(req.params.id);
+  res.json(events);
+});
+
 router.post("/tasks", (req: Request, res: Response) => {
   const { repo, prompt, trustLevel, trustPreset } = req.body as {
     repo?: string;

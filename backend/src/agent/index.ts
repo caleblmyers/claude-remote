@@ -10,6 +10,7 @@ import {
 } from "@anthropic-ai/claude-code";
 import { v4 as uuidv4 } from "uuid";
 import * as db from "../db";
+import { saveTaskEvent } from "../db";
 import { broadcast } from "../ws";
 import { getConfig } from "../config";
 import {
@@ -250,6 +251,7 @@ function processMessage(taskId: string, message: SDKMessage): void {
 
     const simplified = simplifyStreamEvent(partial.event, blockTypes);
     if (simplified) {
+      saveTaskEvent(taskId, simplified.type, JSON.stringify(simplified));
       broadcast({
         type: "task:stream",
         taskId,
