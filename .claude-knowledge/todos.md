@@ -12,56 +12,29 @@
 
 ## Work Sets
 
-### S2: Persist Stream Output
-**Priority:** High — leaving task detail and returning loses all output
-**Status:** Pending
-**Files:**
-- `backend/src/db/index.ts`
-- `backend/src/db/schema.ts`
-- `backend/src/agent/index.ts`
-- `app/src/screens/TaskDetail/index.tsx`
-- `app/src/hooks/useTasks.ts`
-- `app/src/lib/api.ts`
-
-**Items:**
-- [ ] Add `task_events` table in SQLite (id, task_id, event_type, data, created_at)
-- [ ] Save each stream event to DB as it's broadcast
-- [ ] Add API endpoint `GET /tasks/:id/events` to fetch saved events
-- [ ] On TaskDetail mount, load saved events from API (not just live WebSocket)
-- [ ] Merge saved events with live WebSocket events (avoid duplicates)
-
-### S5: Error Handling & UX Polish
-**Priority:** Medium
-**Status:** Pending
-**Files:**
-- `app/src/screens/TaskDetail/index.tsx`
-- `app/src/screens/Home/index.tsx`
-- `app/src/screens/NewTask/index.tsx`
-- `backend/src/api/index.ts`
-
-**Items:**
-- [ ] Show error details when task creation fails (not just "load failed")
-- [ ] Add pull-to-refresh on Home screen
-- [ ] Add loading skeleton on TaskDetail while fetching
-- [ ] Sanitize error messages returned by API (don't leak stack traces)
-- [ ] Add input validation for prompt length
-
----
-
-## Parallelism Matrix
-
-Sets that can run in parallel (no file overlap):
-
-| | S2 | S5 |
-|---|---|---|
-| S2 | - | NO |
-| S5 | NO | - |
-
-**Note:** S2 and S5 overlap on TaskDetail and other files — run sequentially or carefully split.
+(No pending work sets — all moved to Completed or Post-MVP Backlog)
 
 ---
 
 ## Completed
+
+### S2: Persist Stream Output (Wave 2, 2026-03-26)
+- Added `task_events` table in SQLite with FK cascade delete and index on task_id
+- Stream events saved to DB in `processMessage()` before WebSocket broadcast
+- Added `GET /tasks/:id/events` API endpoint for fetching saved events
+- Frontend loads saved events on TaskDetail mount, merges with live WS (deduplication)
+- Loading skeleton on TaskDetail while fetching task + events
+
+### S5: Error Handling & UX Polish (Wave 2, 2026-03-26)
+- Pull-to-refresh on Home screen with touch-based gesture and visual feedback
+- Inline error banners with retry buttons on Home, NewTask, and TaskDetail
+- API error sanitization middleware (no stack traces in production)
+- Input validation: prompt length (1-10000 chars), trust level validation
+- Async task execution errors now update DB status and broadcast `task:error` via WS
+- Character count on prompt textarea, disabled submit when empty/over limit
+- Templates loading state and "Templates unavailable" fallback
+- Dismissable error bar on TaskDetail for all action failures (reply, approve, deny, stop, escalate)
+- Empty state message on Home when no tasks exist
 
 ### S1: Fix Streaming Output (Wave 1, 2026-03-23)
 - Fixed `simplifyStreamEvent()` to handle real SDK event format

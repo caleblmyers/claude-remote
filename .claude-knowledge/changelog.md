@@ -4,6 +4,29 @@ Summaries of work completed each session. Most recent first.
 
 ---
 
+## 2026-03-26 — Wave 2 swarm: event persistence, error handling, UX polish
+
+### S2: Persist Stream Output
+- Added `task_events` SQLite table (id, task_id, event_type, data, created_at) with cascade delete
+- Stream events persisted in `processMessage()` before WebSocket broadcast
+- New `GET /tasks/:id/events` endpoint returns saved events ordered by id
+- Frontend `useTaskOutput()` loads saved events on mount, deduplicates with live WS
+- TaskDetail shows loading skeleton while fetching task data and events
+
+### S5: Error Handling & UX Polish
+- Touch-based pull-to-refresh on Home screen with visual feedback indicator
+- Inline error banners with retry buttons on Home, NewTask, and TaskDetail screens
+- Express error-handling middleware sanitizes errors (no stack traces in production)
+- POST /tasks validates prompt length (1-10000 chars) and trust level against known presets
+- Async `executeTask()`/`replyToTask()` errors now update task status to 'error' and broadcast via WS
+- Character count below prompt textarea, submit disabled when empty or over limit
+- Templates section shows loading state; "Templates unavailable" fallback on fetch failure
+- Dismissable `actionError` bar on TaskDetail for all action failures
+- Empty state message on Home screen when no tasks exist
+- Error state cleared on new input in NewTask
+
+---
+
 ## 2026-03-23 — Wave 1 swarm: streaming, push notifications, connection reliability
 
 ### S1: Fix Streaming Output
