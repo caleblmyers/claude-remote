@@ -53,6 +53,14 @@ export interface TaskWithPermissions extends Task {
   pendingPermissions?: import("./types").PermissionRequest[];
 }
 
+export interface TaskEvent {
+  id: number;
+  taskId: string;
+  eventType: string;
+  data: string;
+  createdAt: string;
+}
+
 export const api = {
   tasks: {
     list: () => request<Task[]>("/tasks"),
@@ -73,6 +81,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ message }),
       }),
+    events: (id: string) => request<TaskEvent[]>(`/tasks/${id}/events`),
     delete: (id: string) =>
       request<void>(`/tasks/${id}`, { method: "DELETE" }),
     approve: (taskId: string, requestId: string) =>

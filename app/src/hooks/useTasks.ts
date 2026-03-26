@@ -101,14 +101,43 @@ export interface TaskOutput {
 
 export function useTaskOutput(taskId: string | undefined) {
   const [entries, setEntries] = useState<StreamEvent[]>([]);
+  const [loadingSaved, setLoadingSaved] = useState(!!taskId);
+  const savedCountRef = useRef(0);
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
+
+  // Load persisted events on mount
+  useEffect(() => {
+    if (!taskId) return;
+    let cancelled = false;
+    setLoadingSaved(true);
+    api.tasks.events(taskId).then((saved) => {
+      if (cancelled) return;
+      const parsed: StreamEvent[] = saved.map((e) => JSON.parse(e.data));
+      savedCountRef.current = parsed.length;
+      setEntries(parsed);
+      setLoadingSaved(false);
+    }).catch(() => {
+      if (!cancelled) setLoadingSaved(false);
+    });
+    return () => { cancelled = true; };
+  }, [taskId]);
 
   const handleEvent = useCallback(
     (event: WsServerEvent) => {
       if (!taskId) return;
       if (event.type === "task:stream" && event.taskId === taskId) {
-        setEntries((prev) => [...prev, event.event]);
+        setEntries((prev) => {
+          // Deduplicate: skip if this matches a saved event we already have
+          if (savedCountRef.current > 0) {
+            const last = prev[savedCountRef.current - 1];
+            if (last && last.type === event.event.type && last.content === event.event.content) {
+              savedCountRef.current--;
+              return prev;
+            }
+          }
+          return [...prev, event.event];
+        });
       }
     },
     [taskId]
@@ -116,5 +145,5 @@ export function useTaskOutput(taskId: string | undefined) {
 
   const clear = useCallback(() => setEntries([]), []);
 
-  return { entries, handleEvent, clear };
+  return { entries, handleEvent, clear, loadingSaved };
 }

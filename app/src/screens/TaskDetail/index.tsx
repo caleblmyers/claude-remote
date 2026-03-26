@@ -14,16 +14,32 @@ export default function TaskDetailScreen() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [task, setTask] = useState<TaskWithPermissions | null>(null);
+  const [taskLoading, setTaskLoading] = useState(true);
   const [output, setOutput] = useState<StreamEvent[]>([]);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+  const savedCountRef = useRef(0);
+  const [eventsLoading, setEventsLoading] = useState(true);
 
   // Fetch task data
   useEffect(() => {
     if (!id) return;
-    api.tasks.get(id).then(setTask).catch(console.error);
+    setTaskLoading(true);
+    api.tasks.get(id).then(setTask).catch(console.error).finally(() => setTaskLoading(false));
+  }, [id]);
+
+  // Load persisted events
+  useEffect(() => {
+    if (!id) return;
+    setEventsLoading(true);
+    api.tasks.events(id).then((saved) => {
+      const parsed: StreamEvent[] = saved.map((e) => JSON.parse(e.data));
+      savedCountRef.current = parsed.length;
+      setOutput(parsed);
+    }).catch(() => {}).finally(() => setEventsLoading(false));
   }, [id]);
 
   // WebSocket event handling
@@ -32,7 +48,17 @@ export default function TaskDetailScreen() {
       if (!id) return;
 
       if (event.type === "task:stream" && event.taskId === id) {
-        setOutput((prev) => [...prev, event.event]);
+        setOutput((prev) => {
+          // Deduplicate against saved events
+          if (savedCountRef.current > 0) {
+            const last = prev[savedCountRef.current - 1];
+            if (last && last.type === event.event.type && last.content === event.event.content) {
+              savedCountRef.current--;
+              return prev;
+            }
+          }
+          return [...prev, event.event];
+        });
       }
 
       if (event.type === "task:status_change" && event.taskId === id) {
@@ -98,7 +124,11 @@ export default function TaskDetailScreen() {
 
   const handleStop = async () => {
     if (!id) return;
-    await api.tasks.stop(id);
+    try {
+      await api.tasks.stop(id);
+    } catch (err: any) {
+      setActionError(`Failed to stop task: ${err.message}`);
+    }
   };
 
   const handleReply = async () => {
@@ -107,8 +137,8 @@ export default function TaskDetailScreen() {
     try {
       await api.tasks.reply(id, reply.trim());
       setReply("");
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setActionError(`Failed to send reply: ${err.message}`);
     } finally {
       setSending(false);
     }
@@ -116,32 +146,40 @@ export default function TaskDetailScreen() {
 
   const handleApprove = async (requestId: string) => {
     if (!id) return;
-    await api.tasks.approve(id, requestId);
-    setTask((prev) =>
-      prev
-        ? {
-            ...prev,
-            pendingPermissions: prev.pendingPermissions?.filter(
-              (p) => p.id !== requestId
-            ),
-          }
-        : prev
-    );
+    try {
+      await api.tasks.approve(id, requestId);
+      setTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              pendingPermissions: prev.pendingPermissions?.filter(
+                (p) => p.id !== requestId
+              ),
+            }
+          : prev
+      );
+    } catch (err: any) {
+      setActionError(`Failed to approve: ${err.message}`);
+    }
   };
 
   const handleDeny = async (requestId: string) => {
     if (!id) return;
-    await api.tasks.deny(id, requestId);
-    setTask((prev) =>
-      prev
-        ? {
-            ...prev,
-            pendingPermissions: prev.pendingPermissions?.filter(
-              (p) => p.id !== requestId
-            ),
-          }
-        : prev
-    );
+    try {
+      await api.tasks.deny(id, requestId);
+      setTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              pendingPermissions: prev.pendingPermissions?.filter(
+                (p) => p.id !== requestId
+              ),
+            }
+          : prev
+      );
+    } catch (err: any) {
+      setActionError(`Failed to deny: ${err.message}`);
+    }
   };
 
   const handleAutoApprove = async (tool: string) => {
@@ -152,8 +190,8 @@ export default function TaskDetailScreen() {
       setTask((prev) =>
         prev ? { ...prev, trustLevel: result.trustLevel as TrustLevel } : prev
       );
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setActionError(`Failed to auto-approve: ${err.message}`);
     }
   };
 
@@ -166,8 +204,8 @@ export default function TaskDetailScreen() {
         trustLevel: task.trustLevel,
       });
       navigate(`/tasks/${newTask.id}`, { replace: true });
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setActionError(`Failed to retry: ${err.message}`);
     }
   };
 
@@ -183,10 +221,26 @@ export default function TaskDetailScreen() {
     }
   };
 
-  if (!task) {
+  if (taskLoading || !task) {
     return (
-      <div className="flex flex-col min-h-dvh bg-gray-950 text-gray-100 items-center justify-center">
-        <p className="text-gray-500 text-sm">Loading...</p>
+      <div className="flex flex-col min-h-dvh bg-gray-950 text-gray-100">
+        <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 shrink-0">
+          <div className="w-11 h-11 rounded-lg bg-gray-800 animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-48 bg-gray-800 rounded animate-pulse" />
+            <div className="h-3 w-20 bg-gray-800 rounded animate-pulse" />
+          </div>
+        </header>
+        <section className="px-4 py-3 border-b border-gray-800">
+          <div className="h-3 w-16 bg-gray-800 rounded animate-pulse mb-2" />
+          <div className="h-4 w-full bg-gray-800 rounded animate-pulse" />
+        </section>
+        <section className="flex-1 px-4 py-3 space-y-2">
+          <div className="h-3 w-3/4 bg-gray-800 rounded animate-pulse" />
+          <div className="h-3 w-1/2 bg-gray-800 rounded animate-pulse" />
+          <div className="h-3 w-2/3 bg-gray-800 rounded animate-pulse" />
+          <div className="h-3 w-1/3 bg-gray-800 rounded animate-pulse" />
+        </section>
       </div>
     );
   }
@@ -288,6 +342,19 @@ export default function TaskDetailScreen() {
         </section>
       )}
 
+      {/* Action error bar */}
+      {actionError && (
+        <div className="px-4 py-2 bg-red-950/30 border-b border-red-800/50 flex items-center justify-between shrink-0">
+          <p className="text-xs text-red-400">{actionError}</p>
+          <button
+            onClick={() => setActionError(null)}
+            className="text-xs text-red-500 hover:text-red-300 ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Output stream */}
       <section
         ref={outputRef}
@@ -298,7 +365,13 @@ export default function TaskDetailScreen() {
           &gt; {task.prompt}
         </div>
 
-        {output.length === 0 ? (
+        {eventsLoading ? (
+          <div className="space-y-2">
+            <div className="h-3 w-3/4 bg-gray-800 rounded animate-pulse" />
+            <div className="h-3 w-1/2 bg-gray-800 rounded animate-pulse" />
+            <div className="h-3 w-2/3 bg-gray-800 rounded animate-pulse" />
+          </div>
+        ) : output.length === 0 ? (
           <p className="text-gray-600 animate-pulse">
             {isActive ? "Running..." : "No output recorded."}
           </p>
