@@ -12,11 +12,17 @@
 
 ## Work Sets
 
-(No pending work sets — all moved to Completed or Post-MVP Backlog)
+(No pending work sets)
 
 ---
 
 ## Completed
+
+### Final polish (2026-03-27)
+- Per-repo `defaultTrustPreset` config field (observe/code/auto) auto-selects trust in NewTask
+- Admin stats endpoint (`GET /api/admin/stats`) + Settings section (connections, uptime, tasks today)
+- Voice input via Web Speech API on NewTask textarea (mic button, pulsing indicator)
+- Swipeable approval carousel for multiple pending permissions (scroll-snap, dots, "X of N")
 
 ### S10: Diff Viewer (Wave 4, 2026-03-27)
 - Captures `git diff HEAD~1` after task completion, parses into per-file diffs
@@ -120,7 +126,4 @@
 
 ## Post-MVP Backlog
 
-- [ ] Per-repo template presets with conservative trust levels
-- [ ] Admin panel for connection monitoring
-- [ ] Voice input via native dictation keyboard
-- [ ] Swipeable approval cards for multiple pending permissions
+(Empty — all items completed)

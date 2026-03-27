@@ -4,6 +4,15 @@ Summaries of work completed each session. Most recent first.
 
 ---
 
+## 2026-03-27 — Final polish: per-repo presets, admin panel, voice input, swipeable approvals
+
+- Per-repo `defaultTrustPreset` config field auto-selects trust level in NewTask
+- `GET /api/admin/stats` endpoint + Admin section in Settings (active connections, uptime, tasks today)
+- Voice input via Web Speech API — mic button on NewTask textarea with pulsing indicator
+- Swipeable approval carousel for 2+ pending permissions (scroll-snap, dot indicators, "X of N")
+
+---
+
 ## 2026-03-27 — Wave 4 swarm: diff viewer, task queue, activity log
 
 ### S10: Diff Viewer
