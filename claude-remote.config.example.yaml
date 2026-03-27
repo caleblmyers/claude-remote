@@ -43,6 +43,7 @@ repos:
 
   - name: another-repo
     path: /home/you/projects/another-repo
+    defaultTrustPreset: observe  # auto-select "observe" trust level for new tasks in this repo
 
 # Templates available across all repos.
 globalTemplates:

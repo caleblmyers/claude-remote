@@ -4,7 +4,7 @@ import * as db from "../db";
 import { getConfig, updateConfig } from "../config";
 import { executeTask, stopTask, replyToTask, isTaskRunning, startNextQueuedTask } from "../agent";
 import { issueToken, validateSetupCode } from "../auth";
-import { broadcast } from "../ws";
+import { broadcast, getConnectionCount } from "../ws";
 import { getVapidPublicKey, isVapidConfigured, sendTestPush } from "../push";
 import diffsRouter from "./diffs";
 import activityRouter from "./activity";
@@ -17,6 +17,16 @@ const router: Router = Router();
 
 router.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// -- Admin Stats --------------------------------------------------------------
+
+router.get("/admin/stats", (_req: Request, res: Response) => {
+  res.json({
+    activeConnections: getConnectionCount(),
+    uptime: process.uptime(),
+    tasksToday: db.countTasksToday(),
+  });
 });
 
 // -- Tasks --------------------------------------------------------------------

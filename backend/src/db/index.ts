@@ -174,6 +174,15 @@ export function listTasks(): Task[] {
   return rows.map(rowToTask);
 }
 
+export function countTasksToday(): number {
+  const db = getDb();
+  const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  const row = db.prepare(
+    "SELECT COUNT(*) as count FROM tasks WHERE created_at >= ?"
+  ).get(`${today}T00:00:00.000Z`) as { count: number };
+  return row.count;
+}
+
 export function updateTask(id: string, updates: Partial<Omit<Task, "id" | "createdAt">>): void {
   const db = getDb();
   const now = new Date().toISOString();

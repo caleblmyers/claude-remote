@@ -176,6 +176,11 @@ function handleClientMessage(_ws: WebSocket, msg: WsMessage): void {
   }
 }
 
+/** Return the number of currently connected WebSocket clients. */
+export function getConnectionCount(): number {
+  return clients.size;
+}
+
 /** Broadcast a message to all connected clients. */
 export function broadcast(event: WsMessage): void {
   const data = JSON.stringify(event);

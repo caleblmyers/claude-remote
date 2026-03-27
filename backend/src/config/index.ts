@@ -16,6 +16,7 @@ export interface RepoConfig {
   name: string;
   path: string;
   templates?: RepoTemplate[];
+  defaultTrustPreset?: "observe" | "code" | "auto";
 }
 
 export interface TrustLevelConfig {

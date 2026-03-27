@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../lib/api";
 import type {
@@ -8,6 +8,11 @@ import type {
   TrustPresetKey,
 } from "../../lib/types";
 import { TRUST_PRESETS, ALL_TOOLS } from "../../lib/types";
+
+const SpeechRecognitionAPI =
+  typeof window !== "undefined"
+    ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    : undefined;
 
 type Step = "repo" | "input";
 
@@ -35,6 +40,32 @@ export default function NewTaskScreen() {
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesError, setTemplatesError] = useState(false);
 
+  // Voice input
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleVoice = () => {
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setListening(false);
+      return;
+    }
+    if (!SpeechRecognitionAPI) return;
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setPrompt((prev) => (prev ? prev + " " + transcript : transcript));
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  };
+
   const PROMPT_MAX_LENGTH = 10_000;
 
   const loadRepos = () => {
@@ -48,6 +79,9 @@ export default function NewTaskScreen() {
           const match = r.find((repo) => repo.name === prefillRepo);
           if (match) {
             setSelectedRepo(match);
+            if (match.defaultTrustPreset) {
+              setTrustPreset(match.defaultTrustPreset);
+            }
             setStep("input");
           }
         }
@@ -78,6 +112,9 @@ export default function NewTaskScreen() {
 
   const handleRepoSelect = (repo: RepoConfig) => {
     setSelectedRepo(repo);
+    if (repo.defaultTrustPreset) {
+      setTrustPreset(repo.defaultTrustPreset);
+    }
     setStep("input");
   };
 
@@ -332,7 +369,26 @@ export default function NewTaskScreen() {
 
         {/* Task input */}
         <section className="flex-1 flex flex-col">
-          <h2 className="text-sm font-medium text-gray-400 mb-2">Task</h2>
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="text-sm font-medium text-gray-400">Task</h2>
+            {SpeechRecognitionAPI && (
+              <button
+                onClick={toggleVoice}
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+                  listening
+                    ? "bg-red-600 text-white animate-pulse"
+                    : "text-gray-400 hover:text-gray-100 hover:bg-gray-800"
+                }`}
+                aria-label={listening ? "Stop voice input" : "Start voice input"}
+                type="button"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                  <path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4Z" />
+                  <path d="M6 11a1 1 0 1 0-2 0 8 8 0 0 0 7 7.93V21H8a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2h-3v-2.07A8 8 0 0 0 20 11a1 1 0 1 0-2 0 6 6 0 0 1-12 0Z" />
+                </svg>
+              </button>
+            )}
+          </div>
           <textarea
             value={prompt}
             onChange={(e) => {

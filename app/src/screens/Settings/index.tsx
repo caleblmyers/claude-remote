@@ -196,6 +196,24 @@ export default function SettingsScreen() {
     });
   };
 
+  // Admin stats
+  const [adminStats, setAdminStats] = useState<{
+    activeConnections: number;
+    uptime: number;
+    tasksToday: number;
+  } | null>(null);
+
+  useEffect(() => {
+    api.admin.stats().then(setAdminStats).catch(() => {});
+  }, []);
+
+  const formatUptime = (seconds: number): string => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  };
+
   const handleLogout = () => {
     logout();
     navigate("/login", { replace: true });
@@ -591,6 +609,29 @@ export default function SettingsScreen() {
                 </div>
               </div>
             </section>
+
+            {/* Admin */}
+            {adminStats && (
+              <section>
+                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                  Admin
+                </h2>
+                <div className="rounded-xl border border-gray-800 divide-y divide-gray-800">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-sm text-gray-300">Active connections</span>
+                    <span className="text-sm text-gray-100">{adminStats.activeConnections}</span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-sm text-gray-300">Server uptime</span>
+                    <span className="text-sm text-gray-100">{formatUptime(adminStats.uptime)}</span>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <span className="text-sm text-gray-300">Tasks today</span>
+                    <span className="text-sm text-gray-100">{adminStats.tasksToday}</span>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* Disconnect */}
             <section>

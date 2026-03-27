@@ -382,15 +382,24 @@ export default function TaskDetailScreen() {
       {/* Inline approval cards */}
       {pendingPerms && pendingPerms.length > 0 && (
         <section className="px-4 py-3 border-b border-amber-800/50 bg-amber-950/20 shrink-0">
-          {pendingPerms.map((perm) => (
+          <p className="text-sm font-medium text-amber-400 mb-3">
+            {pendingPerms.length} permission{pendingPerms.length !== 1 ? "s" : ""} needed
+          </p>
+          {pendingPerms.length === 1 ? (
             <ApprovalCard
-              key={perm.id}
-              perm={perm}
-              onApprove={() => handleApprove(perm.id)}
-              onDeny={() => handleDeny(perm.id)}
+              perm={pendingPerms[0]}
+              onApprove={() => handleApprove(pendingPerms[0].id)}
+              onDeny={() => handleDeny(pendingPerms[0].id)}
               onAutoApprove={handleAutoApprove}
             />
-          ))}
+          ) : (
+            <ApprovalCarousel
+              perms={pendingPerms}
+              onApprove={handleApprove}
+              onDeny={handleDeny}
+              onAutoApprove={handleAutoApprove}
+            />
+          )}
         </section>
       )}
 
@@ -545,6 +554,76 @@ function ApprovalCard({
       >
         Auto-approve {perm.tool} for this session
       </button>
+    </div>
+  );
+}
+
+function ApprovalCarousel({
+  perms,
+  onApprove,
+  onDeny,
+  onAutoApprove,
+}: {
+  perms: PermissionRequest[];
+  onApprove: (requestId: string) => void;
+  onDeny: (requestId: string) => void;
+  onAutoApprove: (tool: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const index = Math.round(el.scrollLeft / el.clientWidth);
+    setActiveIndex(Math.min(index, perms.length - 1));
+  };
+
+  const scrollTo = (index: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" });
+  };
+
+  return (
+    <div>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {perms.map((perm) => (
+          <div
+            key={perm.id}
+            className="w-full flex-shrink-0 snap-start"
+          >
+            <ApprovalCard
+              perm={perm}
+              onApprove={() => onApprove(perm.id)}
+              onDeny={() => onDeny(perm.id)}
+              onAutoApprove={onAutoApprove}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-center gap-2 mt-2">
+        <span className="text-xs text-gray-500">
+          {activeIndex + 1} of {perms.length}
+        </span>
+        <div className="flex gap-1">
+          {perms.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => scrollTo(i)}
+              className={`w-2 h-2 rounded-full transition-colors ${
+                i === activeIndex ? "bg-amber-400" : "bg-gray-700"
+              }`}
+              aria-label={`Go to permission ${i + 1}`}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

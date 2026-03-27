@@ -155,6 +155,11 @@ export const api = {
       }),
   },
 
+  admin: {
+    stats: () =>
+      request<{ activeConnections: number; uptime: number; tasksToday: number }>("/admin/stats"),
+  },
+
   activity: {
     list: (limit = 50, offset = 0) =>
       request<ActivityEntry[]>(`/activity?limit=${limit}&offset=${offset}`),
