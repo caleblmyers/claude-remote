@@ -50,26 +50,18 @@ You are setting up a new swarm wave. Follow these steps precisely.
 
 7. **Write tasks.json** with all planned tasks.
 
-8. **Output copy-paste prompts** for the user:
+8. **Output launch commands** for the user:
 
-   ### Worker 1 (`cd ~/projects/claude-remote-worker-1 && claude`)
-   ```
-   Start working. Read your tasks from /home/caleb/projects/claude-remote/.ai/taskswarm/tasks.json, find tasks assigned to you, and begin implementing them. Follow the workflow in your CLAUDE.md.
-   ```
+   Each worktree has a `.claude/swarm-role.md` injected by `spawn.sh` that tells Claude its role automatically. No paste needed — just run `claude`.
 
-   ### Worker 2 (`cd ~/projects/claude-remote-worker-2 && claude`)
    ```
-   Start working. Read your tasks from /home/caleb/projects/claude-remote/.ai/taskswarm/tasks.json, find tasks assigned to you, and begin implementing them. Follow the workflow in your CLAUDE.md.
-   ```
+   # Workers (each in a separate terminal)
+   cd ~/projects/claude-remote-worker-1 && claude
+   cd ~/projects/claude-remote-worker-2 && claude
+   cd ~/projects/claude-remote-worker-3 && claude
 
-   ### Worker 3 (`cd ~/projects/claude-remote-worker-3 && claude`)
-   ```
-   Start working. Read your tasks from /home/caleb/projects/claude-remote/.ai/taskswarm/tasks.json, find tasks assigned to you, and begin implementing them. Follow the workflow in your CLAUDE.md.
-   ```
-
-   ### Reviewer (`cd ~/projects/claude-remote-reviewer && claude`)
-   ```
-   Start reviewing. Watch /home/caleb/projects/claude-remote/.ai/taskswarm/tasks.json for completed tasks and review/merge them following your CLAUDE.md workflow. Loop until all tasks are merged.
+   # Reviewer
+   cd ~/projects/claude-remote-reviewer && claude
    ```
 
 9. **Show a summary table** of the wave plan:

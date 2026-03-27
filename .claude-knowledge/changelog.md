@@ -4,6 +4,36 @@ Summaries of work completed each session. Most recent first.
 
 ---
 
+## 2026-03-26 — Wave 3 swarm: e2e test fixes, session resumption, CORS
+
+### S6+S7: Fix E2E Tests + Login 401 Bug
+- Fixed `request()` 401 handler to not redirect for `/auth/login` — error now propagates with status code
+- `resetState()` clears browser localStorage between tests to prevent state bleed
+- Fixed all test selectors across 6 suites to match actual rendered UI
+- Fixed WebSocket timing in task-detail tests (proper waits for connection)
+- Fixed seeding order in home/navigation tests (seed before login)
+- All 74 e2e tests passing (37 portrait + 37 landscape on Mobile Chrome)
+
+### S8: Session Resumption UX
+- Reply input conditionally shown only for completed/stopped/failed tasks with sessionId
+- Contextual placeholder text based on task status
+- Optimistic user message display in output stream (indigo-colored `user_message` type)
+- Optimistic status transition to "running" after reply sent
+- New `user_message` stream event type added to types
+
+### S9: CORS Restriction
+- Replaced hardcoded `Access-Control-Allow-Origin: *` with configurable origins
+- Added `cors.allowedOrigins` to config schema (default `['*']` for backwards compatibility)
+- Dynamic CORS middleware checks request Origin against allowed list
+- `Vary: Origin` header for proper caching when using specific origins
+- `CLAUDE_REMOTE_CORS_ORIGINS` env var support (comma-separated)
+- Updated example config with cors section
+
+### Infrastructure
+- Updated `/task-swarm` skill: workers auto-start via injected `.claude/swarm-role.md` (no paste needed)
+
+---
+
 ## 2026-03-26 — Wave 2 swarm: event persistence, error handling, UX polish
 
 ### S2: Persist Stream Output

@@ -12,86 +12,33 @@
 
 ## Work Sets
 
-### S6: Fix E2E Tests
-**Priority:** High — 19/37 tests failing, need to match actual UI
-**Status:** Pending
-**Files:**
-- `app/e2e/tests/login.spec.ts`
-- `app/e2e/tests/home.spec.ts`
-- `app/e2e/tests/new-task.spec.ts`
-- `app/e2e/tests/task-detail.spec.ts`
-- `app/e2e/tests/settings.spec.ts`
-- `app/e2e/tests/navigation.spec.ts`
-- `app/e2e/helpers.ts`
-- `app/e2e/mock-server.ts`
-
-**Items:**
-- [ ] Read each screen component to understand actual rendered text/elements, then fix selectors
-- [ ] Fix login error test: app shows "Connection failed" for 401 — either fix the app bug in `api.ts` (401 handler throws "Unauthorized" which doesn't include "401" for useAuth check) or update test
-- [ ] Fix state bleed: `resetState()` clears server but not browser localStorage — add `page.evaluate(() => localStorage.clear())` in helpers or beforeEach
-- [ ] Fix WS timing: tests that send events via control API need `page.waitForSelector` instead of `page.waitForTimeout`
-- [ ] Fix home screen tests: `fastLogin` + `seedTask` + `reload` pattern may race — ensure tasks are seeded before page loads
-- [ ] Fix new-task tests: all fail because `fastLogin` navigates to `/` then test navigates to `/new`, but resetState may not have repos ready
-- [ ] Run `pnpm test:e2e` and verify all 37 tests pass on both Mobile Chrome portrait + landscape
-
-### S7: Fix Login 401 Error Message
-**Priority:** Medium — minor UX bug found during e2e testing
-**Status:** Pending
-**Files:**
-- `app/src/lib/api.ts`
-- `app/src/hooks/useAuth.ts`
-
-**Items:**
-- [ ] Fix `request()` in api.ts: for `/auth/login` endpoint, don't trigger the global 401 handler (clearToken + redirect). Instead, let the error propagate with the status code so useAuth can show "Invalid setup code"
-- [ ] Alternatively, change useAuth to check for "Unauthorized" in the error message instead of "401"
-
-### S8: Session Resumption
-**Priority:** High — core Phase 2 feature
-**Status:** Pending
-**Files:**
-- `backend/src/agent/index.ts`
-- `backend/src/api/index.ts`
-- `app/src/screens/TaskDetail/index.tsx`
-- `app/src/lib/api.ts`
-
-**Items:**
-- [ ] Backend: use Agent SDK `resume` option to continue a session by sessionId
-- [ ] Backend: add `POST /tasks/:id/reply` handler that calls `replyToTask()` with session resumption
-- [ ] Frontend: on completed tasks with a sessionId, show a reply input to continue the conversation
-- [ ] Frontend: reply sends message, task status changes back to running, output resumes streaming
-
-### S9: CORS Restriction
-**Priority:** Medium — security improvement
-**Status:** Pending
-**Files:**
-- `backend/src/index.ts`
-
-**Items:**
-- [ ] Replace `Access-Control-Allow-Origin: *` with configurable allowed origins
-- [ ] Add `cors.allowedOrigins` field to config schema (defaults to `*` for dev)
-- [ ] In production, restrict to the actual Tailscale IP or hostname
-
----
-
-## Parallelism Matrix
-
-Sets that can run in parallel (no file overlap):
-
-| | S6 | S7 | S8 | S9 |
-|---|---|---|---|---|
-| S6 | - | NO | NO | YES |
-| S7 | NO | - | NO | YES |
-| S8 | NO | NO | - | YES |
-| S9 | YES | YES | YES | - |
-
-**Notes:**
-- S6 and S7 overlap on `api.ts` and `useAuth.ts`
-- S6 and S8 overlap on `TaskDetail` and `api.ts`
-- S9 is fully independent (only touches `backend/src/index.ts`)
+(No pending work sets — all moved to Completed or Post-MVP Backlog)
 
 ---
 
 ## Completed
+
+### S6+S7: Fix E2E Tests + Login 401 Bug (Wave 3, 2026-03-26)
+- Fixed login 401 bug: `request()` now throws with status code so useAuth shows "Invalid setup code"
+- Fixed `resetState()` to clear browser localStorage between tests
+- Fixed all test selectors to match actual UI text/elements
+- Fixed WS timing issues with proper waits
+- Fixed state bleed and seeding order in home/navigation tests
+- All 74 e2e tests passing (37 per device, Mobile Chrome portrait + landscape)
+
+### S8: Session Resumption UX (Wave 3, 2026-03-26)
+- Conditional reply input: only visible for completed/stopped/failed tasks with sessionId
+- Contextual placeholder: "Continue this conversation..." / "Resume this task..." / "Retry with a message..."
+- Optimistic user message display in output stream (indigo-colored, immediate)
+- Optimistic status transition to "running" after reply sent
+- Added `user_message` stream event type
+
+### S9: CORS Restriction (Wave 3, 2026-03-26)
+- Added `cors.allowedOrigins` config field with default `['*']` (backwards compatible)
+- Dynamic CORS middleware checks request Origin against allowed list
+- `Vary: Origin` header set when not using wildcard
+- `CLAUDE_REMOTE_CORS_ORIGINS` env var override (comma-separated)
+- Updated example config with cors section and comments
 
 ### S2: Persist Stream Output (Wave 2, 2026-03-26)
 - Added `task_events` table in SQLite with FK cascade delete and index on task_id
@@ -145,7 +92,6 @@ Sets that can run in parallel (no file overlap):
 
 ## Post-MVP Backlog
 
-- [ ] Session resumption (reply to completed tasks to continue)
 - [ ] Diff viewer (syntax-highlighted file diffs in task detail)
 - [ ] Activity log for security monitoring (login attempts, task runs, approvals)
 - [ ] Per-repo template presets with conservative trust levels
