@@ -692,14 +692,116 @@ function DiffFileEntry({
   );
 }
 
+/** Render inline markdown: **bold**, `code`, *italic* */
+function renderInlineMarkdown(text: string): (string | React.ReactElement)[] {
+  const parts: (string | React.ReactElement)[] = [];
+  let key = 0;
+  // Match **bold**, `code`, *italic* (in that order to avoid conflicts)
+  const regex = /(\*\*(.+?)\*\*)|(`([^`]+)`)|(\*(.+?)\*)/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    if (match[1]) {
+      // **bold**
+      parts.push(<strong key={key++} className="font-semibold text-gray-200">{match[2]}</strong>);
+    } else if (match[3]) {
+      // `code`
+      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-gray-800 text-indigo-300 text-[0.85em]">{match[4]}</code>);
+    } else if (match[5]) {
+      // *italic*
+      parts.push(<em key={key++} className="italic text-gray-400">{match[6]}</em>);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts.length > 0 ? parts : [text];
+}
+
+/** Render a text block with basic markdown: headers, code blocks, lists, bold, code, italic */
+function FormattedText({ content }: { content: string }) {
+  const lines = content.split("\n");
+  const elements: React.ReactElement[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Code block: ```
+    if (line.trimStart().startsWith("```")) {
+      const codeLines: string[] = [];
+      const lang = line.trimStart().slice(3).trim();
+      i++;
+      while (i < lines.length && !lines[i].trimStart().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing ```
+      elements.push(
+        <pre key={elements.length} className="my-1.5 p-2 rounded bg-gray-900 border border-gray-800 overflow-x-auto text-gray-300">
+          {lang && <div className="text-[0.7em] text-gray-600 mb-1">{lang}</div>}
+          {codeLines.join("\n")}
+        </pre>
+      );
+      continue;
+    }
+
+    // Headers: # ## ###
+    const headerMatch = line.match(/^(#{1,3})\s+(.+)/);
+    if (headerMatch) {
+      const level = headerMatch[1].length;
+      const sizes = ["text-sm font-bold", "text-xs font-bold", "text-xs font-semibold"];
+      elements.push(
+        <div key={elements.length} className={`${sizes[level - 1]} text-gray-200 mt-2 mb-1`}>
+          {renderInlineMarkdown(headerMatch[2])}
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // List items: - or * or numbered
+    const listMatch = line.match(/^(\s*)([-*]|\d+\.)\s+(.+)/);
+    if (listMatch) {
+      const indent = Math.floor(listMatch[1].length / 2);
+      elements.push(
+        <div key={elements.length} className="text-gray-300" style={{ paddingLeft: `${(indent + 1) * 0.75}rem` }}>
+          <span className="text-gray-600 mr-1">{listMatch[2].match(/\d/) ? listMatch[2] : "•"}</span>
+          {renderInlineMarkdown(listMatch[3])}
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Empty line = spacing
+    if (line.trim() === "") {
+      elements.push(<div key={elements.length} className="h-1" />);
+      i++;
+      continue;
+    }
+
+    // Regular text with inline markdown
+    elements.push(
+      <span key={elements.length} className="text-gray-300">
+        {renderInlineMarkdown(line)}
+        {"\n"}
+      </span>
+    );
+    i++;
+  }
+
+  return <>{elements}</>;
+}
+
 function OutputEntry({ entry }: { entry: StreamEvent }) {
   switch (entry.type) {
     case "text":
-      return (
-        <span className="text-gray-300 whitespace-pre-wrap">
-          {entry.content}
-        </span>
-      );
+      return <FormattedText content={entry.content ?? ""} />;
     case "user_message":
       return (
         <div className="text-indigo-400 mt-2 mb-2 pt-2 border-t border-gray-800">
@@ -709,17 +811,17 @@ function OutputEntry({ entry }: { entry: StreamEvent }) {
     case "tool_start":
       return (
         <div className="text-indigo-400 mt-2 mb-1">
-          \u25B6 {entry.tool}
+          {"\u25B6"} {entry.tool}
         </div>
       );
     case "tool_input":
       return (
-        <span className="text-gray-500 whitespace-pre-wrap">
+        <pre className="text-gray-500 whitespace-pre-wrap overflow-x-auto">
           {entry.input}
-        </span>
+        </pre>
       );
     case "tool_end":
-      return <div className="text-gray-600 mb-1">\u2500\u2500\u2500</div>;
+      return <div className="text-gray-700 mb-1">{"\u2500".repeat(20)}</div>;
     case "turn_complete":
       return <div className="border-t border-gray-800 my-2" />;
     default:
