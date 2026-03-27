@@ -27,9 +27,20 @@ interface FileDiff {
   deletions: number;
 }
 
-function captureGitDiffs(cwd: string): FileDiff[] {
+function getGitHead(cwd: string): string | null {
   try {
-    const raw = execSync("git diff HEAD~1", { cwd, encoding: "utf-8", maxBuffer: 5 * 1024 * 1024 });
+    return execSync("git rev-parse HEAD", { cwd, encoding: "utf-8" }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function captureGitDiffs(cwd: string, baseCommit?: string | null): FileDiff[] {
+  try {
+    // Diff working tree against the commit from before the task started.
+    // This captures only what changed during this task (staged + unstaged + new commits).
+    const diffTarget = baseCommit ?? "HEAD~1";
+    const raw = execSync(`git diff ${diffTarget}`, { cwd, encoding: "utf-8", maxBuffer: 5 * 1024 * 1024 });
     if (!raw.trim()) return [];
 
     const fileDiffs: FileDiff[] = [];
@@ -261,7 +272,7 @@ function createPermissionHook(taskId: string, trustLevel: db.Task["trustLevel"])
   };
 }
 
-function processMessage(taskId: string, message: SDKMessage): void {
+function processMessage(taskId: string, message: SDKMessage, baseCommit?: string | null): void {
   const msg = message as any;
   console.log(`[sdk] message type=${msg.type} subtype=${msg.subtype ?? ""}`);
 
@@ -323,7 +334,7 @@ function processMessage(taskId: string, message: SDKMessage): void {
       const config = getConfig();
       const repoConfig = config.repos.find((r) => r.name === taskForNotify.repo);
       if (repoConfig) {
-        diffs = captureGitDiffs(repoConfig.path);
+        diffs = captureGitDiffs(repoConfig.path, baseCommit);
       }
     }
 
@@ -380,6 +391,9 @@ export async function executeTask(taskId: string): Promise<void> {
   const cwd = repoConfig.path;
   const trustLevel = task.trustLevel;
 
+  // Snapshot git HEAD before execution so we can diff only this task's changes
+  const baseCommit = getGitHead(cwd);
+
   const controller = new AbortController();
   runningTasks.set(taskId, controller);
 
@@ -409,7 +423,7 @@ export async function executeTask(taskId: string): Promise<void> {
 
     for await (const message of messages) {
       if (controller.signal.aborted) break;
-      processMessage(taskId, message);
+      processMessage(taskId, message, baseCommit);
     }
 
     // If loop exited without a result (abort), mark stopped
@@ -493,6 +507,7 @@ export async function replyToTask(
   }
   const cwd = repoConfig.path;
   const trustLevel = task.trustLevel;
+  const replyBaseCommit = getGitHead(cwd);
   const controller = new AbortController();
   runningTasks.set(taskId, controller);
 
@@ -522,7 +537,7 @@ export async function replyToTask(
 
     for await (const msg of messages) {
       if (controller.signal.aborted) break;
-      processMessage(taskId, msg);
+      processMessage(taskId, msg, replyBaseCommit);
     }
 
     const finalTask = db.getTask(taskId);
