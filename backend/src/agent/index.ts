@@ -446,7 +446,27 @@ export async function executeTask(taskId: string): Promise<void> {
   } finally {
     runningTasks.delete(taskId);
     taskStreamState.delete(taskId);
+    // Auto-start next queued task for this repo
+    const finishedTask = db.getTask(taskId);
+    if (finishedTask) {
+      startNextQueuedTask(finishedTask.repo);
+    }
   }
+}
+
+export function startNextQueuedTask(repo: string): void {
+  const next = db.getOldestQueuedTask(repo);
+  if (!next) return;
+
+  // Verify no other task is running in this repo
+  const running = db.listRunningTasksByRepo(repo);
+  if (running.length > 0) return;
+
+  executeTask(next.id).catch((err) => {
+    console.error(`Queued task ${next.id} execution failed:`, err.message);
+    db.updateTask(next.id, { status: "failed", error: err.message });
+    broadcast({ type: "task:error", taskId: next.id, error: err.message });
+  });
 }
 
 export async function replyToTask(
@@ -517,5 +537,10 @@ export async function replyToTask(
   } finally {
     runningTasks.delete(taskId);
     taskStreamState.delete(taskId);
+    // Auto-start next queued task for this repo
+    const finishedReply = db.getTask(taskId);
+    if (finishedReply) {
+      startNextQueuedTask(finishedReply.repo);
+    }
   }
 }

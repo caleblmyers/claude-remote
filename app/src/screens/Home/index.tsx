@@ -302,6 +302,11 @@ function TaskCard({
             <span className={`text-sm ${STATUS_COLOR[task.status]}`}>
               {STATUS_ICON[task.status]}
             </span>
+            {task.status === "queued" && task.queuePosition ? (
+              <span className="text-xs text-gray-400">
+                Queued (#{task.queuePosition})
+              </span>
+            ) : null}
             <span className="text-sm font-medium truncate">{task.repo}</span>
             {!isActive && (
               <span className="text-xs text-gray-600">

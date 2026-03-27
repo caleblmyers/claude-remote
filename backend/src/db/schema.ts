@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS task_events (
 
 CREATE INDEX IF NOT EXISTS idx_task_events_task_id ON task_events(task_id);
 
+CREATE INDEX IF NOT EXISTS idx_tasks_repo_status ON tasks(repo, status);
+
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   endpoint     TEXT NOT NULL UNIQUE,

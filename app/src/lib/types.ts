@@ -24,6 +24,7 @@ export interface Task {
   summary?: string;
   filesChanged?: string[];
   error?: string;
+  queuePosition?: number;
   createdAt: string;
   updatedAt: string;
 }

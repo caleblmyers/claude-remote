@@ -196,6 +196,32 @@ export function deleteTask(id: string): void {
   getDb().prepare("DELETE FROM tasks WHERE id = ?").run(id);
 }
 
+export function listRunningTasksByRepo(repo: string): Task[] {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT * FROM tasks WHERE repo = ? AND status IN ('running', 'waiting_approval')"
+  ).all(repo) as TaskRow[];
+  return rows.map(rowToTask);
+}
+
+export function getOldestQueuedTask(repo: string): Task | undefined {
+  const db = getDb();
+  const row = db.prepare(
+    "SELECT * FROM tasks WHERE repo = ? AND status = 'queued' ORDER BY created_at ASC LIMIT 1"
+  ).get(repo) as TaskRow | undefined;
+  return row ? rowToTask(row) : undefined;
+}
+
+export function getQueuePosition(taskId: string): number {
+  const db = getDb();
+  const task = db.prepare("SELECT repo, created_at FROM tasks WHERE id = ? AND status = 'queued'").get(taskId) as { repo: string; created_at: string } | undefined;
+  if (!task) return 0;
+  const count = db.prepare(
+    "SELECT COUNT(*) as cnt FROM tasks WHERE repo = ? AND status = 'queued' AND created_at < ?"
+  ).get(task.repo, task.created_at) as { cnt: number };
+  return count.cnt + 1;
+}
+
 // ── Task Events ──────────────────────────────────────────────────────────────
 
 function rowToTaskEvent(row: TaskEventRow): TaskEvent {

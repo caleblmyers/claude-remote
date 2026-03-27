@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { v4 as uuidv4 } from "uuid";
 import * as db from "../db";
 import { getConfig, updateConfig } from "../config";
-import { executeTask, stopTask, replyToTask, isTaskRunning } from "../agent";
+import { executeTask, stopTask, replyToTask, isTaskRunning, startNextQueuedTask } from "../agent";
 import { issueToken, validateSetupCode } from "../auth";
 import { broadcast } from "../ws";
 import { getVapidPublicKey, isVapidConfigured, sendTestPush } from "../push";
@@ -32,7 +32,8 @@ router.get("/tasks/:id", (req: Request, res: Response) => {
 
   // Include pending permissions in the response
   const pendingPermissions = db.listPendingPermissions(task.id);
-  res.json({ ...task, pendingPermissions });
+  const queuePosition = task.status === "queued" ? db.getQueuePosition(task.id) : undefined;
+  res.json({ ...task, pendingPermissions, ...(queuePosition ? { queuePosition } : {}) });
 });
 
 router.get("/tasks/:id/events", (req: Request, res: Response) => {
@@ -76,6 +77,21 @@ router.post("/tasks", (req: Request, res: Response) => {
 
   db.logActivity("task_created", task.id, { repo: task.repo });
 
+  // Check if another task is already running in this repo
+  const runningInRepo = db.listRunningTasksByRepo(repo);
+  if (runningInRepo.length > 0) {
+    // Stay queued — don't execute yet
+    broadcast({
+      type: "task:created",
+      taskId: task.id,
+      repo: task.repo,
+      prompt: task.prompt,
+      status: task.status,
+    });
+    const queuePosition = db.getQueuePosition(task.id);
+    return res.status(201).json({ ...task, queuePosition });
+  }
+
   // Broadcast task creation
   broadcast({
     type: "task:created",
@@ -109,6 +125,8 @@ router.post("/tasks/:id/stop", (req: Request, res: Response) => {
       oldStatus: task.status,
       newStatus: "stopped",
     });
+    // Start next queued task for this repo
+    startNextQueuedTask(task.repo);
   }
 
   db.logActivity("task_stopped", task.id, { repo: task.repo });
