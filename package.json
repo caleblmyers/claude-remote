@@ -10,6 +10,7 @@
     "dev:backend": "pnpm --filter claude-remote-backend run dev",
     "dev:app": "pnpm --filter app exec vite",
     "build": "pnpm --filter claude-remote-backend run build && pnpm --filter app run build",
-    "start": "pnpm --filter claude-remote-backend run start"
+    "start": "pnpm --filter claude-remote-backend run start",
+    "test:e2e": "pnpm --filter app run test:e2e"
   }
 }

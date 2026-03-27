@@ -1,12 +1,15 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { WsServerEvent } from "../lib/types";
 
+declare const __API_PORT__: string;
+
 function getWsUrl(): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const host = window.location.hostname;
   // In dev, Vite runs on a different port than the backend
-  const devPorts = ["5173", "5174"];
-  const port = devPorts.includes(window.location.port) ? "3000" : window.location.port;
+  const devPorts = ["5173", "5174", "5199"];
+  const backendPort = typeof __API_PORT__ !== "undefined" ? __API_PORT__ : "3000";
+  const port = devPorts.includes(window.location.port) ? backendPort : window.location.port;
   const token = localStorage.getItem("claude-remote-token") ?? "";
   return `${proto}//${host}:${port}?token=${encodeURIComponent(token)}`;
 }

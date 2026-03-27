@@ -17,15 +17,20 @@ function handleConnectionReset(): Plugin {
   };
 }
 
+const apiPort = process.env.VITE_API_PORT ?? "3000";
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), handleConnectionReset()],
+  define: {
+    __API_PORT__: JSON.stringify(apiPort),
+  },
   server: {
     host: true,
     port: 5174,
     proxy: {
-      "/api": "http://localhost:3000",
+      "/api": `http://localhost:${apiPort}`,
       "/ws": {
-        target: "ws://localhost:3000",
+        target: `ws://localhost:${apiPort}`,
         ws: true,
       },
     },
