@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { resetState, fastLogin, seedTask } from "../helpers";
+import { resetState, fastLogin, seedTask, completeTask } from "../helpers";
 
 test.beforeEach(async ({ page }) => {
   await resetState();
@@ -31,23 +31,21 @@ test("tap task navigates to detail", async ({ page }) => {
 test("task status updates via WebSocket", async ({ page }) => {
   const task = await seedTask({ id: "t1", repo: "my-project", status: "running" });
   await page.reload();
-  await page.waitForTimeout(500); // wait for WS
+  await page.waitForTimeout(1000); // wait for WS connection
 
-  // Complete the task via control API — the WS event should update the UI
-  const { completeTask } = await import("../helpers");
   await completeTask(task.id, "Done!");
 
   await expect(page.getByText(/completed/i)).toBeVisible({ timeout: 5000 });
 });
 
 test("new task button navigates to /new", async ({ page }) => {
-  await page.getByRole("link", { name: /new task/i }).or(page.locator("a[href='/new']")).first().click();
+  await page.getByRole("button", { name: /new task/i }).or(page.locator("a[href='/new']")).first().click();
   await page.waitForURL("/new");
   await expect(page).toHaveURL("/new");
 });
 
 test("settings button navigates to /settings", async ({ page }) => {
-  await page.getByRole("link", { name: /settings/i }).or(page.locator("a[href='/settings']")).first().click();
+  await page.getByText("⚙").click();
   await page.waitForURL("/settings");
   await expect(page).toHaveURL("/settings");
 });
