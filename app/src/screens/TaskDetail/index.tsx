@@ -800,24 +800,23 @@ function FormattedText({ content }: { content: string }) {
       continue;
     }
 
-    // Empty line = spacing
+    // Empty line = paragraph break
     if (line.trim() === "") {
-      elements.push(<div key={elements.length} className="h-1" />);
+      elements.push(<div key={elements.length} className="h-3" />);
       i++;
       continue;
     }
 
-    // Regular text with inline markdown
+    // Regular text with inline markdown — use <p> for proper block layout
     elements.push(
-      <span key={elements.length} className="text-gray-300">
+      <p key={elements.length} className="text-gray-300 my-0.5 leading-relaxed">
         {renderInlineMarkdown(line)}
-        {"\n"}
-      </span>
+      </p>
     );
     i++;
   }
 
-  return <>{elements}</>;
+  return <div className="space-y-0">{elements}</div>;
 }
 
 function OutputEntry({ entry }: { entry: StreamEvent }) {
