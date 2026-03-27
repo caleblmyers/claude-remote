@@ -5,7 +5,7 @@ disable-model-invocation: false
 user-invocable: true
 ---
 
-Start working. Read your tasks from /home/caleb/projects/claude-remote/.ai/taskswarm/tasks.json, find tasks assigned to you, and begin implementing them. Follow the workflow in your CLAUDE.md. After completing each task, run `pnpm run build` to validate before marking complete.
+Start working. Read your tasks from {REPO_ROOT}/.ai/taskswarm/tasks.json, find tasks assigned to you, and begin implementing them. Follow the workflow in your CLAUDE.md. After completing each task, run `pnpm run build` to validate before marking complete.
 
 ## Task Dependencies
 

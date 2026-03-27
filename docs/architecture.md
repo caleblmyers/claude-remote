@@ -218,8 +218,8 @@ auth:
   secret: "..."     # JWT secret for token auth
 
 repos:
-  - name: task-toad
-    path: /home/caleb/task-toad
+  - name: my-app
+    path: /home/you/projects/my-app
     templates:
       - name: Run tests
         prompt: "Run the test suite and report results"
@@ -228,19 +228,8 @@ repos:
         prompt: "Fix all lint errors"
         trustLevel: { autoApprove: [Read, Edit, Bash] }
 
-  - name: brain
-    path: /home/caleb/brain
-    templates:
-      - name: Daily log
-        prompt: "log today"
-      - name: Status check
-        prompt: "status"
-
-  - name: middlelands-io
-    path: /home/caleb/middlelands-io
-
-  - name: movie-night-picker
-    path: /home/caleb/movie-night-picker
+  - name: my-other-repo
+    path: /home/you/projects/my-other-repo
 
 globalTemplates:
   - name: Run tests

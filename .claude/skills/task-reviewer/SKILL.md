@@ -5,7 +5,7 @@ disable-model-invocation: false
 user-invocable: true
 ---
 
-Start reviewing. Watch /home/caleb/projects/claude-remote/.ai/taskswarm/tasks.json for completed tasks and review/merge them following your CLAUDE.md workflow. Loop until all tasks are merged. Remember: you NEVER write code — send tasks back to workers if anything fails validation.
+Start reviewing. Watch {REPO_ROOT}/.ai/taskswarm/tasks.json for completed tasks and review/merge them following your CLAUDE.md workflow. Loop until all tasks are merged. Remember: you NEVER write code — send tasks back to workers if anything fails validation.
 
 ## Merge Order
 
