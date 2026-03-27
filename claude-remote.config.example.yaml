@@ -18,6 +18,16 @@ vapid:
   privateKey: "your-vapid-private-key"
   mailto: "mailto:you@example.com"
 
+# CORS configuration.
+# allowedOrigins controls which browser origins can make requests.
+# Use ['*'] to allow all origins (default, fine for Tailscale-only setups).
+# For production, restrict to your PWA's origin:
+#   allowedOrigins: ["https://your-phone-ip:5173"]
+# Can also be set via CLAUDE_REMOTE_CORS_ORIGINS env var (comma-separated).
+cors:
+  allowedOrigins:
+    - "*"
+
 # Repos that Claude can work in.
 # Each repo needs an absolute path on the machine running the backend.
 repos:

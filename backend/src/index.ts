@@ -20,9 +20,24 @@ initVapid();
 const app: express.Express = express();
 app.use(express.json());
 
-// Allow CORS from the Vite dev server during development
-app.use((_req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+// CORS middleware: uses config.cors.allowedOrigins to control access.
+// If allowedOrigins includes '*', all origins are allowed (default).
+// Otherwise, only requests whose Origin header matches an entry are allowed.
+app.use((req, res, next) => {
+  const { allowedOrigins } = config.cors;
+  const requestOrigin = req.headers.origin;
+
+  if (allowedOrigins.includes("*")) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  } else if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    res.setHeader("Access-Control-Allow-Origin", requestOrigin);
+    res.setHeader("Vary", "Origin");
+  } else {
+    // Origin not allowed — omit the header so the browser blocks the request
+    if (req.method === "OPTIONS") return res.sendStatus(403);
+    return next();
+  }
+
   res.setHeader(
     "Access-Control-Allow-Methods",
     "GET,POST,PUT,DELETE,OPTIONS"
@@ -31,7 +46,7 @@ app.use((_req, res, next) => {
     "Access-Control-Allow-Headers",
     "Content-Type,Authorization"
   );
-  if (_req.method === "OPTIONS") return res.sendStatus(204);
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 

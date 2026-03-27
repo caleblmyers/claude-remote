@@ -30,6 +30,10 @@ export interface VapidConfig {
   mailto?: string;
 }
 
+export interface CorsConfig {
+  allowedOrigins: string[];
+}
+
 export interface AppConfig {
   server: {
     port: number;
@@ -38,6 +42,7 @@ export interface AppConfig {
   auth: {
     secret: string;
   };
+  cors: CorsConfig;
   vapid?: VapidConfig;
   repos: RepoConfig[];
   globalTemplates: RepoTemplate[];
@@ -86,9 +91,18 @@ export function loadConfig(): AppConfig {
     console.log(`Config loaded from ${configPath}`);
   }
 
-  // Environment variable overrides for secrets
+  // Environment variable overrides
   if (process.env.CLAUDE_REMOTE_AUTH_SECRET) {
     config.auth.secret = process.env.CLAUDE_REMOTE_AUTH_SECRET;
+  }
+  if (process.env.CLAUDE_REMOTE_CORS_ORIGINS) {
+    config.cors = {
+      allowedOrigins: process.env.CLAUDE_REMOTE_CORS_ORIGINS.split(",").map((s) => s.trim()),
+    };
+  }
+  // Ensure cors config exists (for configs loaded from older yaml files)
+  if (!config.cors) {
+    config.cors = { allowedOrigins: ["*"] };
   }
   if (process.env.CLAUDE_REMOTE_VAPID_PUBLIC_KEY && process.env.CLAUDE_REMOTE_VAPID_PRIVATE_KEY) {
     config.vapid = {
@@ -138,6 +152,7 @@ function defaultConfig(): AppConfig {
   return {
     server: { port: parseInt(process.env.PORT || '3001'), host: "0.0.0.0" },
     auth: { secret: "change-me-before-use" },
+    cors: { allowedOrigins: ["*"] },
     repos: [],
     globalTemplates: [],
     defaults: {
