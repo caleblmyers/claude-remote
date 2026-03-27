@@ -12,80 +12,36 @@
 
 ## Work Sets
 
-### S10: Diff Viewer
-**Priority:** Medium — see what Claude changed at a glance
-**Status:** Pending
-**Files:**
-- `backend/src/agent/index.ts`
-- `backend/src/api/diffs.ts` (new)
-- `app/src/screens/TaskDetail/index.tsx`
-- `app/src/lib/api.ts`
-
-**Items:**
-- [ ] Backend: capture `git diff` output after task completion in the repo's working directory
-- [ ] Backend: store diff content with task (new `diffs` JSON field on task, or separate endpoint)
-- [ ] Backend: add `GET /tasks/:id/diffs` endpoint returning per-file diffs
-- [ ] Frontend: add collapsible "Changes" section in TaskDetail below summary
-- [ ] Frontend: render diffs with syntax highlighting (simple monospace with +/- coloring, no external deps)
-
-### S11: Task Queue + Concurrency
-**Priority:** Medium — prevents conflicts when starting multiple tasks
-**Status:** Pending
-**Files:**
-- `backend/src/db/index.ts`
-- `backend/src/db/schema.ts`
-- `backend/src/api/index.ts`
-- `app/src/screens/Home/index.tsx`
-
-**Items:**
-- [ ] Backend: add `listRunningTasksByRepo(repo)` DB query
-- [ ] Backend: POST /tasks checks for running tasks in same repo, queues if one exists
-- [ ] Backend: add `startNextQueuedTask(repo)` called when a task completes/stops
-- [ ] Backend: allow concurrent tasks across different repos
-- [ ] Frontend: show queue position on queued task cards ("Queued (#2)")
-
-### S12: Activity Log
-**Priority:** Low — security monitoring and audit trail
-**Status:** Pending
-**Files:**
-- `backend/src/db/schema.ts`
-- `backend/src/db/index.ts`
-- `backend/src/api/activity.ts` (new)
-- `app/src/screens/Settings/index.tsx`
-- `app/src/lib/api.ts`
-
-**Items:**
-- [ ] Backend: add `activity_log` table (id, user_action, task_id, detail JSON, created_at)
-- [ ] Backend: add `logActivity()` and `listActivityLog()` DB functions
-- [ ] Backend: add `GET /api/activity` endpoint (paginated, most recent first)
-- [ ] Backend: insert log entries at: login, task create/complete/fail/stop, approve/deny, config update
-- [ ] Frontend: add "Activity Log" section in Settings with scrollable list
-
----
-
-## Parallelism Matrix
-
-| | S10 | S11 | S12 |
-|---|---|---|---|
-| S10 | - | NO | NO |
-| S11 | NO | - | NO |
-| S12 | NO | NO | - |
-
-**Notes:**
-- S10 and S11 overlap on `agent/index.ts` and `api/index.ts`
-- S10 and S12 overlap on `api.ts` (frontend)
-- S11 and S12 overlap on `db/schema.ts`, `db/index.ts`, `api/index.ts`
-- To parallelize: S10 uses `api/diffs.ts` (new file), S12 uses `api/activity.ts` (new file), keeping API overlap minimal. But `db/schema.ts` and `db/index.ts` overlap between S11 and S12.
-
-**Best 3-worker split:**
-- Worker 1: S10 (diff viewer) — uses new `api/diffs.ts`, touches `agent/index.ts` and `TaskDetail`
-- Worker 2: S11 (task queue) — touches `db/*`, `api/index.ts`, `Home`
-- Worker 3: S12 (activity log) — uses new `api/activity.ts` and new DB table, touches `Settings`
-- Risk: Worker 2 and 3 both touch `db/schema.ts` and `db/index.ts` — reviewer merges carefully
+(No pending work sets — all moved to Completed or Post-MVP Backlog)
 
 ---
 
 ## Completed
+
+### S10: Diff Viewer (Wave 4, 2026-03-27)
+- Captures `git diff HEAD~1` after task completion, parses into per-file diffs
+- New `diffs` TEXT column on tasks table, stored as JSON
+- New `GET /tasks/:id/diffs` endpoint via `api/diffs.ts` router
+- Collapsible "Changes" section in TaskDetail with file list (+/- counts)
+- Expandable per-file diff with color coding (+green, -red, @@blue)
+- Graceful fallback when git diff fails (empty array)
+
+### S11: Task Queue + Concurrency (Wave 4, 2026-03-27)
+- Per-repo task queuing: only one task runs per repo at a time
+- Cross-repo concurrent tasks allowed
+- `listRunningTasksByRepo()` DB query with `(repo, status)` index
+- POST /tasks checks for running tasks, queues if busy
+- `startNextQueuedTask(repo)` auto-starts next queued task on completion/stop/fail
+- `getQueuePosition()` returns position in queue
+- Home screen shows "Queued (#N)" with position on queued task cards
+
+### S12: Activity Log (Wave 4, 2026-03-27)
+- `activity_log` table (action, task_id, detail JSON, created_at)
+- `logActivity()` called at: login, login_failed, task_created/completed/failed/stopped, permission_approved/denied, trust_escalated, config_updated
+- `GET /api/activity` endpoint with pagination (limit/offset)
+- Activity Log section in Settings with human-readable action descriptions
+- Relative timestamps and task links
+- "Load more" pagination button
 
 ### S6+S7: Fix E2E Tests + Login 401 Bug (Wave 3, 2026-03-26)
 - Fixed login 401 bug: `request()` now throws with status code so useAuth shows "Invalid setup code"
@@ -156,6 +112,9 @@
 - [ ] Include `app/src/lib/api.ts` in task file lists when adding new backend API endpoints
 - [ ] Ensure main branch is clean (no uncommitted changes) before spawning swarm worktrees
 - [ ] Workers should verify timing-specific acceptance criteria before marking tasks complete
+- [ ] Ensure task `files` array matches ALL files mentioned in the task description
+- [ ] Task descriptions for frontend changes should explicitly mention type updates when new fields are introduced
+- [ ] For shared files (db/*, api/*), use dependency ordering or group into a single worker to avoid merge conflicts
 
 ---
 

@@ -4,6 +4,35 @@ Summaries of work completed each session. Most recent first.
 
 ---
 
+## 2026-03-27 — Wave 4 swarm: diff viewer, task queue, activity log
+
+### S10: Diff Viewer
+- Captures `git diff HEAD~1` after task completion in repo working directory
+- Parses raw diff into structured per-file objects (path, diff text, +/- counts)
+- Stored as JSON in new `diffs` column on tasks table
+- New `GET /tasks/:id/diffs` endpoint via dedicated `api/diffs.ts` router
+- Collapsible "Changes" section in TaskDetail with file list and +/- summary
+- Per-file expandable diff view with syntax coloring (+green, -red, @@blue)
+
+### S11: Task Queue + Concurrency
+- Per-repo task queuing: only one task runs per repo at a time
+- Cross-repo concurrent tasks allowed (different repos execute in parallel)
+- New `listRunningTasksByRepo()` DB query with composite `(repo, status)` index
+- POST /tasks checks for active tasks in same repo before starting execution
+- `startNextQueuedTask()` auto-starts next queued task when current finishes
+- Queue position exposed in task API response
+- Home screen shows "Queued (#N)" badge on queued task cards
+
+### S12: Activity Log
+- New `activity_log` table with action type, optional task link, JSON detail, timestamp
+- Logging at all key API points: login/login_failed, task lifecycle, permissions, config
+- `GET /api/activity` endpoint with limit/offset pagination
+- Activity Log section in Settings with human-readable descriptions and timestamps
+- Task-related entries link to the task detail screen
+- "Load more" button for paginated browsing
+
+---
+
 ## 2026-03-26 — Wave 3 swarm: e2e test fixes, session resumption, CORS
 
 ### S6+S7: Fix E2E Tests + Login 401 Bug
