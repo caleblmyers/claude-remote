@@ -103,7 +103,7 @@ export function loadConfig(): AppConfig {
   }
   // Ensure cors config exists (for configs loaded from older yaml files)
   if (!config.cors) {
-    config.cors = { allowedOrigins: ["*"] };
+    config.cors = { allowedOrigins: [] };
   }
   if (process.env.CLAUDE_REMOTE_VAPID_PUBLIC_KEY && process.env.CLAUDE_REMOTE_VAPID_PRIVATE_KEY) {
     config.vapid = {
@@ -111,6 +111,19 @@ export function loadConfig(): AppConfig {
       privateKey: process.env.CLAUDE_REMOTE_VAPID_PRIVATE_KEY,
       mailto: process.env.CLAUDE_REMOTE_VAPID_MAILTO ?? config.vapid?.mailto,
     };
+  }
+
+  // Refuse to start with the default auth secret
+  const DEFAULT_SECRETS = ["change-me-before-use", "change-me-to-a-random-string"];
+  if (DEFAULT_SECRETS.includes(config.auth.secret)) {
+    console.error(
+      "\n" +
+      "ERROR: You must set a real auth secret before running Claude Remote.\n" +
+      "  Option 1: Set CLAUDE_REMOTE_AUTH_SECRET environment variable\n" +
+      "  Option 2: Change auth.secret in your claude-remote.config.yaml\n" +
+      "  Generate one with: openssl rand -hex 32\n"
+    );
+    process.exit(1);
   }
 
   _config = config;
@@ -153,7 +166,7 @@ function defaultConfig(): AppConfig {
   return {
     server: { port: parseInt(process.env.PORT || '3001'), host: "0.0.0.0" },
     auth: { secret: "change-me-before-use" },
-    cors: { allowedOrigins: ["*"] },
+    cors: { allowedOrigins: [] },
     repos: [],
     globalTemplates: [],
     defaults: {

@@ -3,7 +3,7 @@ import { IncomingMessage } from "http";
 import { Server } from "http";
 import * as db from "../db";
 import { stopTask, replyToTask } from "../agent";
-import { verifyToken } from "../auth";
+import { consumeWsTicket } from "./tickets";
 import url from "url";
 
 export type WsEventType =
@@ -58,17 +58,19 @@ export function createWsServer(httpServer: Server): WebSocketServer {
   });
 
   wss.on("connection", (ws: HeartbeatWebSocket, req: IncomingMessage) => {
-    // Validate auth token from query string
+    // Authenticate via single-use, short-lived ticket (not a long-lived JWT).
+    // The client obtains a ticket from POST /auth/ws-ticket before connecting.
     const parsed = url.parse(req.url ?? "", true);
-    const token = parsed.query.token as string | undefined;
+    const ticket = parsed.query.ticket as string | undefined;
 
-    if (!token || !verifyToken(token)) {
+    if (!ticket || !consumeWsTicket(ticket)) {
       ws.close(4001, "Unauthorized");
       return;
     }
 
     const clientId = nextClientId++;
     clients.set(clientId, ws);
+    // Note: Do not log the request URL — it contains the auth ticket.
     console.log(`WebSocket client connected (id=${clientId})`);
 
     ws.on("pong", () => {

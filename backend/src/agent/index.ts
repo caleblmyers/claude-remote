@@ -322,8 +322,9 @@ function processMessage(taskId: string, message: SDKMessage): void {
     if (!result.is_error && taskForNotify) {
       const config = getConfig();
       const repoConfig = config.repos.find((r) => r.name === taskForNotify.repo);
-      const cwd = repoConfig?.path ?? taskForNotify.repo;
-      diffs = captureGitDiffs(cwd);
+      if (repoConfig) {
+        diffs = captureGitDiffs(repoConfig.path);
+      }
     }
 
     db.updateTask(taskId, {
@@ -370,7 +371,13 @@ export async function executeTask(taskId: string): Promise<void> {
 
   const config = getConfig();
   const repoConfig = config.repos.find((r) => r.name === task.repo);
-  const cwd = repoConfig?.path ?? task.repo;
+  if (!repoConfig) {
+    db.updateTask(taskId, { status: "failed", error: `Unknown repo: ${task.repo}` });
+    broadcast({ type: "task:error", taskId, error: `Unknown repo: ${task.repo}` });
+    broadcast({ type: "task:status_change", taskId, oldStatus: "queued", newStatus: "failed" });
+    throw new Error(`Repo "${task.repo}" is not in the configured repos list. Refusing to execute.`);
+  }
+  const cwd = repoConfig.path;
   const trustLevel = task.trustLevel;
 
   const controller = new AbortController();
@@ -479,7 +486,12 @@ export async function replyToTask(
 
   const config = getConfig();
   const repoConfig = config.repos.find((r) => r.name === task.repo);
-  const cwd = repoConfig?.path ?? task.repo;
+  if (!repoConfig) {
+    db.updateTask(taskId, { status: "failed", error: `Unknown repo: ${task.repo}` });
+    broadcast({ type: "task:error", taskId, error: `Unknown repo: ${task.repo}` });
+    throw new Error(`Repo "${task.repo}" is not in the configured repos list. Refusing to execute.`);
+  }
+  const cwd = repoConfig.path;
   const trustLevel = task.trustLevel;
   const controller = new AbortController();
   runningTasks.set(taskId, controller);

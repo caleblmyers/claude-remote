@@ -21,15 +21,24 @@ const app: express.Express = express();
 app.use(express.json());
 
 // CORS middleware: uses config.cors.allowedOrigins to control access.
-// If allowedOrigins includes '*', all origins are allowed (default).
+// If allowedOrigins is empty, auto-derive safe local-dev origins from the server config.
+// If allowedOrigins includes '*', all origins are allowed (not recommended).
 // Otherwise, only requests whose Origin header matches an entry are allowed.
+const effectiveOrigins: string[] =
+  config.cors.allowedOrigins.length > 0
+    ? config.cors.allowedOrigins
+    : [
+        `http://localhost:${config.server.port}`,
+        `http://localhost:5173`,
+        `http://localhost:5174`,
+      ];
+
 app.use((req, res, next) => {
-  const { allowedOrigins } = config.cors;
   const requestOrigin = req.headers.origin;
 
-  if (allowedOrigins.includes("*")) {
+  if (effectiveOrigins.includes("*")) {
     res.setHeader("Access-Control-Allow-Origin", "*");
-  } else if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+  } else if (requestOrigin && effectiveOrigins.includes(requestOrigin)) {
     res.setHeader("Access-Control-Allow-Origin", requestOrigin);
     res.setHeader("Vary", "Origin");
   } else {

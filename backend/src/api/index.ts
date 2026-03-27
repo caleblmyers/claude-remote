@@ -1,11 +1,13 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { v4 as uuidv4 } from "uuid";
+import rateLimit from "express-rate-limit";
 import * as db from "../db";
 import { getConfig, updateConfig } from "../config";
 import { executeTask, stopTask, replyToTask, isTaskRunning, startNextQueuedTask } from "../agent";
-import { issueToken, validateSetupCode } from "../auth";
+import { issueToken, validateSetupCode, verifyToken } from "../auth";
 import { broadcast, getConnectionCount } from "../ws";
 import { getVapidPublicKey, isVapidConfigured, sendTestPush } from "../push";
+import { createWsTicket } from "../ws/tickets";
 import diffsRouter from "./diffs";
 import activityRouter from "./activity";
 
@@ -66,6 +68,13 @@ router.post("/tasks", (req: Request, res: Response) => {
     return res.status(400).json({ error: "repo and prompt are required" });
   }
 
+  // Validate repo name against configured repos
+  const config = getConfig();
+  const repoConfig = config.repos.find((r) => r.name === repo);
+  if (!repoConfig) {
+    return res.status(400).json({ error: `Unknown repo: "${repo}". Must match a configured repo name.` });
+  }
+
   if (typeof prompt !== "string" || prompt.length < 1 || prompt.length > 10000) {
     return res.status(400).json({ error: "Prompt must be between 1 and 10000 characters" });
   }
@@ -74,7 +83,6 @@ router.post("/tasks", (req: Request, res: Response) => {
     return res.status(400).json({ error: `Invalid trust preset. Must be one of: ${VALID_TRUST_PRESETS.join(", ")}` });
   }
 
-  const config = getConfig();
   const defaultTrust = config.defaults.trustLevel;
 
   const task = db.createTask({
@@ -351,7 +359,15 @@ router.put("/config", (req: Request, res: Response) => {
 
 // -- Auth ---------------------------------------------------------------------
 
-router.post("/auth/login", (req: Request, res: Response) => {
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 5 attempts per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Please try again in a minute." },
+});
+
+router.post("/auth/login", loginLimiter, (req: Request, res: Response) => {
   const { code } = req.body as { code?: string };
   if (!code) {
     return res.status(400).json({ error: "Setup code is required" });
@@ -365,6 +381,12 @@ router.post("/auth/login", (req: Request, res: Response) => {
   const token = issueToken();
   db.logActivity("login");
   res.json({ token });
+});
+
+router.post("/auth/ws-ticket", (req: Request, res: Response) => {
+  // This endpoint is already behind authMiddleware, so the caller is authenticated.
+  const ticket = createWsTicket();
+  res.json({ ticket });
 });
 
 // -- Diffs --------------------------------------------------------------------

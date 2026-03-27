@@ -177,6 +177,10 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ code }),
       }),
+    wsTicket: () =>
+      request<{ ticket: string }>("/auth/ws-ticket", {
+        method: "POST",
+      }),
   },
 
   health: {

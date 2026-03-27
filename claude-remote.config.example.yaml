@@ -20,13 +20,14 @@ vapid:
 
 # CORS configuration.
 # allowedOrigins controls which browser origins can make requests.
-# Use ['*'] to allow all origins (default, fine for Tailscale-only setups).
-# For production, restrict to your PWA's origin:
-#   allowedOrigins: ["https://your-phone-ip:5173"]
+# When empty (default), origins are auto-derived for local dev:
+#   http://localhost:<server.port>, http://localhost:5173, http://localhost:5174
+# For Tailscale or production, add your phone's origin explicitly:
+#   allowedOrigins: ["http://100.x.y.z:3000"]
+# Use ['*'] to allow all origins (not recommended).
 # Can also be set via CLAUDE_REMOTE_CORS_ORIGINS env var (comma-separated).
 cors:
-  allowedOrigins:
-    - "*"
+  allowedOrigins: []
 
 # Repos that Claude can work in.
 # Each repo needs an absolute path on the machine running the backend.

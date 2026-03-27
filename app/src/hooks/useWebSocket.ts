@@ -1,17 +1,25 @@
 import { useEffect, useRef, useCallback, useState } from "react";
+import { api } from "../lib/api";
 import type { WsServerEvent } from "../lib/types";
 
 declare const __API_PORT__: string;
 
-function getWsUrl(): string {
+function getWsBaseUrl(): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const host = window.location.hostname;
   // In dev, Vite runs on a different port than the backend
   const devPorts = ["5173", "5174", "5199"];
   const backendPort = typeof __API_PORT__ !== "undefined" ? __API_PORT__ : "3000";
   const port = devPorts.includes(window.location.port) ? backendPort : window.location.port;
-  const token = localStorage.getItem("claude-remote-token") ?? "";
-  return `${proto}//${host}:${port}?token=${encodeURIComponent(token)}`;
+  return `${proto}//${host}:${port}`;
+}
+
+async function getWsUrl(): Promise<string> {
+  // Fetch a short-lived, single-use ticket from the backend to authenticate
+  // the WebSocket connection. This avoids putting long-lived JWTs in the
+  // query string where they could be logged or leaked via Referer headers.
+  const { ticket } = await api.auth.wsTicket();
+  return `${getWsBaseUrl()}?ticket=${encodeURIComponent(ticket)}`;
 }
 
 export type WsStatus = "connecting" | "connected" | "disconnected" | "error";
@@ -54,20 +62,10 @@ export function useWebSocket(
     }
   }, []);
 
-  const connect = useCallback(() => {
-    // Don't connect without a token
-    if (!localStorage.getItem("claude-remote-token")) {
-      setStatus("disconnected");
-      return;
-    }
+  // Use a ref for connect so initWs can reference it without circular useCallback deps
+  const connectRef = useRef<() => void>(() => {});
 
-    // Don't connect while paused (screen off or offline)
-    if (pausedRef.current) return;
-
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-    setStatus("connecting");
-    const ws = new WebSocket(getWsUrl());
+  const initWs = useCallback((ws: WebSocket) => {
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -98,7 +96,7 @@ export function useWebSocket(
       // Exponential backoff: 1s, 2s, 4s, 8s, max 15s
       const delay = reconnectDelay.current;
       reconnectDelay.current = Math.min(delay * 2, 15000);
-      reconnectTimer.current = setTimeout(connect, delay);
+      reconnectTimer.current = setTimeout(connectRef.current, delay);
     };
 
     ws.onerror = () => {
@@ -106,6 +104,40 @@ export function useWebSocket(
       ws.close();
     };
   }, [resetStaleTimer]);
+
+  const connect = useCallback(() => {
+    // Don't connect without a token
+    if (!localStorage.getItem("claude-remote-token")) {
+      setStatus("disconnected");
+      return;
+    }
+
+    // Don't connect while paused (screen off or offline)
+    if (pausedRef.current) return;
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    setStatus("connecting");
+
+    // Fetch a single-use ticket, then open the WebSocket
+    getWsUrl()
+      .then((wsUrl) => {
+        // Re-check state after async ticket fetch
+        if (pausedRef.current || wsRef.current?.readyState === WebSocket.OPEN) return;
+        const ws = new WebSocket(wsUrl);
+        initWs(ws);
+      })
+      .catch(() => {
+        setStatus("error");
+        // Schedule reconnect on ticket fetch failure
+        const delay = reconnectDelay.current;
+        reconnectDelay.current = Math.min(delay * 2, 15000);
+        reconnectTimer.current = setTimeout(connectRef.current, delay);
+      });
+  }, [resetStaleTimer, initWs]);
+
+  // Keep ref in sync
+  connectRef.current = connect;
 
   // Visibility change: pause reconnects when screen is off, reconnect immediately when on
   useEffect(() => {
