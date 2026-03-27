@@ -437,7 +437,7 @@ export default function TaskDetailScreen() {
             {isActive ? "Running..." : "No output recorded."}
           </p>
         ) : (
-          output.map((entry, i) => <OutputEntry key={i} entry={entry} />)
+          mergeTextEvents(output).map((entry, i) => <OutputEntry key={i} entry={entry} />)
         )}
       </section>
 
@@ -690,6 +690,28 @@ function DiffFileEntry({
       )}
     </div>
   );
+}
+
+/** Merge consecutive text events into single entries so FormattedText gets full paragraphs */
+function mergeTextEvents(events: StreamEvent[]): StreamEvent[] {
+  const merged: StreamEvent[] = [];
+  let textBuffer = "";
+
+  for (const event of events) {
+    if (event.type === "text") {
+      textBuffer += event.content ?? "";
+    } else {
+      if (textBuffer) {
+        merged.push({ type: "text", content: textBuffer });
+        textBuffer = "";
+      }
+      merged.push(event);
+    }
+  }
+  if (textBuffer) {
+    merged.push({ type: "text", content: textBuffer });
+  }
+  return merged;
 }
 
 /** Render inline markdown: **bold**, `code`, *italic* */
