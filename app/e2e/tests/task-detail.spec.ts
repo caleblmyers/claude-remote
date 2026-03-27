@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import { resetState, fastLogin, seedTask, seedPermission, sendStreamEvents, completeTask, failTask } from "../helpers";
-import { createStreamEvents } from "../fixtures";
 
 test.beforeEach(async ({ page }) => {
   await resetState();
@@ -18,7 +17,7 @@ test("shows task info", async ({ page }) => {
 test("streaming output appears in real-time", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "running" });
   await page.goto(`/tasks/${task.id}`);
-  await page.waitForTimeout(500); // wait for WS
+  await page.waitForTimeout(1000); // wait for WS
 
   await sendStreamEvents(task.id, [
     { type: "text", content: "Analyzing the codebase now..." },
@@ -30,7 +29,7 @@ test("streaming output appears in real-time", async ({ page }) => {
 test("tool start/end events render", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "running" });
   await page.goto(`/tasks/${task.id}`);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
 
   await sendStreamEvents(task.id, [
     { type: "tool_start", tool: "Read" },
@@ -38,18 +37,18 @@ test("tool start/end events render", async ({ page }) => {
     { type: "tool_end", tool: "Read" },
   ]);
 
-  await expect(page.getByText(/Read/)).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText(/Read/).first()).toBeVisible({ timeout: 5000 });
   await expect(page.getByText("src/index.ts")).toBeVisible();
 });
 
 test("approval card appears for pending permission", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "running" });
   await page.goto(`/tasks/${task.id}`);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
 
   await seedPermission(task.id, { tool: "Bash", input: { command: "npm test" } });
 
-  await expect(page.getByText(/Bash/i)).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText(/Claude wants to use.*Bash/i)).toBeVisible({ timeout: 5000 });
   await expect(page.getByRole("button", { name: /approve/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /deny/i })).toBeVisible();
 });
@@ -57,23 +56,22 @@ test("approval card appears for pending permission", async ({ page }) => {
 test("approve button resolves permission", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "running" });
   await page.goto(`/tasks/${task.id}`);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
 
   await seedPermission(task.id, { tool: "Bash", input: { command: "npm test" } });
-  await page.waitForTimeout(500);
+  await expect(page.getByRole("button", { name: /approve/i })).toBeVisible({ timeout: 5000 });
 
   await page.getByRole("button", { name: /approve/i }).click();
-  // Permission card should be dismissed or status should change
   await expect(page.getByText(/running/i).first()).toBeVisible({ timeout: 5000 });
 });
 
 test("deny button resolves permission", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "running" });
   await page.goto(`/tasks/${task.id}`);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
 
   await seedPermission(task.id, { tool: "Bash", input: { command: "rm -rf /" } });
-  await page.waitForTimeout(500);
+  await expect(page.getByRole("button", { name: /deny/i })).toBeVisible({ timeout: 5000 });
 
   await page.getByRole("button", { name: /deny/i }).click();
   await expect(page.getByText(/running/i).first()).toBeVisible({ timeout: 5000 });
@@ -82,7 +80,7 @@ test("deny button resolves permission", async ({ page }) => {
 test("task completion updates UI", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "running" });
   await page.goto(`/tasks/${task.id}`);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
 
   await completeTask(task.id, "Fixed 3 bugs, all tests passing");
 
@@ -93,7 +91,7 @@ test("task completion updates UI", async ({ page }) => {
 test("task failure shows error", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "running" });
   await page.goto(`/tasks/${task.id}`);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(1000);
 
   await failTask(task.id, "Build failed: syntax error in index.ts");
 
@@ -119,22 +117,28 @@ test("stop button stops the task", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "running" });
   await page.goto(`/tasks/${task.id}`);
 
-  const stopBtn = page.getByRole("button", { name: /stop/i });
+  const stopBtn = page.getByRole("button", { name: /stop|⏹/i });
   if (await stopBtn.isVisible()) {
     await stopBtn.click();
     await expect(page.getByText(/stopped/i)).toBeVisible({ timeout: 5000 });
   }
 });
 
+test("reply input visible for completed task with session", async ({ page }) => {
+  const task = await seedTask({ id: "t1", status: "completed", sessionId: "session-1" });
+  await page.goto(`/tasks/${task.id}`);
+
+  const replyInput = page.locator("input[placeholder*='reply'], input[placeholder*='Reply'], textarea[placeholder*='reply'], textarea[placeholder*='Reply']");
+  await expect(replyInput.first()).toBeVisible({ timeout: 5000 });
+});
+
 test("reply input sends message", async ({ page }) => {
   const task = await seedTask({ id: "t1", status: "completed", sessionId: "session-1" });
   await page.goto(`/tasks/${task.id}`);
 
-  const replyInput = page.locator("input[placeholder*='Reply'], textarea[placeholder*='Reply'], input[placeholder*='reply'], textarea[placeholder*='reply']");
-  if (await replyInput.isVisible()) {
-    await replyInput.fill("Also fix the linter warnings");
-    await page.keyboard.press("Enter");
-    // Should send the reply
-    await page.waitForTimeout(500);
-  }
+  const replyInput = page.locator("input[placeholder*='reply'], input[placeholder*='Reply'], textarea[placeholder*='reply'], textarea[placeholder*='Reply']").first();
+  await expect(replyInput).toBeVisible({ timeout: 5000 });
+  await replyInput.fill("Also fix the linter warnings");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(500);
 });

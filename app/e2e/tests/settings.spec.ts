@@ -5,6 +5,8 @@ test.beforeEach(async ({ page }) => {
   await resetState();
   await fastLogin(page);
   await page.goto("/settings");
+  // Wait for config to load
+  await expect(page.getByText("my-project")).toBeVisible({ timeout: 5000 });
 });
 
 test("shows repos from config", async ({ page }) => {
@@ -18,7 +20,7 @@ test("shows global templates", async ({ page }) => {
 });
 
 test("disconnect/logout redirects to login", async ({ page }) => {
-  const logoutBtn = page.getByRole("button", { name: /disconnect|logout|sign out/i });
+  const logoutBtn = page.getByRole("button", { name: /disconnect/i });
   await logoutBtn.click();
   await page.waitForURL("/login");
   await expect(page).toHaveURL("/login");
