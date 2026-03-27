@@ -133,10 +133,15 @@ export default function TaskDetailScreen() {
 
   const handleReply = async () => {
     if (!id || !reply.trim() || sending) return;
+    const message = reply.trim();
     setSending(true);
+    // Optimistic: show user message in output stream immediately
+    setOutput((prev) => [...prev, { type: "user_message", content: message }]);
+    setReply("");
     try {
-      await api.tasks.reply(id, reply.trim());
-      setReply("");
+      await api.tasks.reply(id, message);
+      // Optimistic: update status to running
+      setTask((prev) => (prev ? { ...prev, status: "running" } : prev));
     } catch (err: any) {
       setActionError(`Failed to send reply: ${err.message}`);
     } finally {
@@ -380,24 +385,35 @@ export default function TaskDetailScreen() {
         )}
       </section>
 
-      {/* Reply input */}
-      <footer className="px-4 py-3 border-t border-gray-800 flex gap-3 shrink-0">
-        <input
-          type="text"
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a reply..."
-          className="flex-1 h-11 bg-gray-900 border border-gray-800 rounded-lg px-3 text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <button
-          onClick={handleReply}
-          disabled={!reply.trim() || sending}
-          className="h-11 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
-        >
-          Send
-        </button>
-      </footer>
+      {/* Reply input — only visible for resumable finished tasks */}
+      {task.sessionId &&
+        (task.status === "completed" ||
+          task.status === "stopped" ||
+          task.status === "failed") && (
+          <footer className="px-4 py-3 border-t border-gray-800 flex gap-3 shrink-0">
+            <input
+              type="text"
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                task.status === "completed"
+                  ? "Continue this conversation..."
+                  : task.status === "stopped"
+                    ? "Resume this task..."
+                    : "Retry with a message..."
+              }
+              className="flex-1 h-11 bg-gray-900 border border-gray-800 rounded-lg px-3 text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              onClick={handleReply}
+              disabled={!reply.trim() || sending}
+              className="h-11 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              Send
+            </button>
+          </footer>
+        )}
     </div>
   );
 }
@@ -513,6 +529,12 @@ function OutputEntry({ entry }: { entry: StreamEvent }) {
         <span className="text-gray-300 whitespace-pre-wrap">
           {entry.content}
         </span>
+      );
+    case "user_message":
+      return (
+        <div className="text-indigo-400 mt-2 mb-2 pt-2 border-t border-gray-800">
+          &gt; {entry.content}
+        </div>
       );
     case "tool_start":
       return (
