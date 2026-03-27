@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { resetState } from "../helpers";
 
-test.beforeEach(async () => {
-  await resetState();
+test.beforeEach(async ({ page }) => {
+  await resetState(page);
 });
 
 test("shows login form", async ({ page }) => {
@@ -24,8 +24,7 @@ test("invalid code shows error", async ({ page }) => {
   await page.goto("/login");
   await page.getByPlaceholder(/setup code/i).fill("wrong-code");
   await page.getByRole("button", { name: /connect/i }).click();
-  // App shows "Connection failed" because the 401 handler throws "Unauthorized" (not including "401")
-  await expect(page.getByText(/connection failed|invalid setup code/i)).toBeVisible();
+  await expect(page.getByText(/invalid setup code/i)).toBeVisible();
 });
 
 test("unauthenticated access redirects to login", async ({ page }) => {

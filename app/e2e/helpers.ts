@@ -16,8 +16,11 @@ async function controlPost<T = unknown>(path: string, body?: unknown): Promise<T
   return res.json() as Promise<T>;
 }
 
-export async function resetState(): Promise<void> {
+export async function resetState(page?: Page): Promise<void> {
   await controlPost("/reset");
+  if (page) {
+    await page.evaluate(() => localStorage.clear());
+  }
 }
 
 export async function seedTask(overrides: Partial<Task> = {}): Promise<Task> {

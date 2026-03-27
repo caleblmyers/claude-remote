@@ -32,10 +32,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   });
 
-  if (res.status === 401) {
+  if (res.status === 401 && path !== "/auth/login") {
     clearToken();
     window.location.href = "/login";
     throw new Error("Unauthorized");
+  }
+
+  if (res.status === 401) {
+    throw new Error("Unauthorized (401)");
   }
 
   if (!res.ok) {
