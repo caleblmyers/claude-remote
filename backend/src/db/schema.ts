@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   session_id   TEXT,
   summary      TEXT,
   files_changed TEXT,                         -- JSON: string[]
+  diffs        TEXT,                          -- JSON: FileDiff[]
   error        TEXT,
   created_at   TEXT NOT NULL,
   updated_at   TEXT NOT NULL

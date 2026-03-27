@@ -15,6 +15,7 @@ export interface Task {
   sessionId?: string;
   summary?: string;
   filesChanged?: string[];
+  diffs?: Array<{ path: string; diff: string; additions: number; deletions: number }>;
   error?: string;
   createdAt: string;
   updatedAt: string;
@@ -48,6 +49,7 @@ type TaskRow = {
   session_id: string | null;
   summary: string | null;
   files_changed: string | null;
+  diffs: string | null;
   error: string | null;
   created_at: string;
   updated_at: string;
@@ -97,6 +99,7 @@ function rowToTask(row: TaskRow): Task {
     sessionId: row.session_id ?? undefined,
     summary: row.summary ?? undefined,
     filesChanged: row.files_changed ? JSON.parse(row.files_changed) : undefined,
+    diffs: row.diffs ? JSON.parse(row.diffs) : undefined,
     error: row.error ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -122,8 +125,8 @@ export function createTask(task: Omit<Task, "createdAt" | "updatedAt">): Task {
   const db = getDb();
   const now = new Date().toISOString();
   db.prepare(`
-    INSERT INTO tasks (id, repo, prompt, status, trust_level, session_id, summary, files_changed, error, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (id, repo, prompt, status, trust_level, session_id, summary, files_changed, diffs, error, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     task.id,
     task.repo,
@@ -133,6 +136,7 @@ export function createTask(task: Omit<Task, "createdAt" | "updatedAt">): Task {
     task.sessionId ?? null,
     task.summary ?? null,
     task.filesChanged ? JSON.stringify(task.filesChanged) : null,
+    task.diffs ? JSON.stringify(task.diffs) : null,
     task.error ?? null,
     now,
     now,
@@ -164,6 +168,7 @@ export function updateTask(id: string, updates: Partial<Omit<Task, "id" | "creat
   if (updates.sessionId !== undefined) { fields.push("session_id = ?"); values.push(updates.sessionId); }
   if (updates.summary !== undefined) { fields.push("summary = ?"); values.push(updates.summary); }
   if (updates.filesChanged !== undefined) { fields.push("files_changed = ?"); values.push(JSON.stringify(updates.filesChanged)); }
+  if (updates.diffs !== undefined) { fields.push("diffs = ?"); values.push(JSON.stringify(updates.diffs)); }
   if (updates.error !== undefined) { fields.push("error = ?"); values.push(updates.error); }
   if (updates.trustLevel !== undefined) { fields.push("trust_level = ?"); values.push(JSON.stringify(updates.trustLevel)); }
 

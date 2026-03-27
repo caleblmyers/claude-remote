@@ -6,6 +6,7 @@ import { executeTask, stopTask, replyToTask, isTaskRunning } from "../agent";
 import { issueToken, validateSetupCode } from "../auth";
 import { broadcast } from "../ws";
 import { getVapidPublicKey, isVapidConfigured, sendTestPush } from "../push";
+import diffsRouter from "./diffs";
 
 const VALID_TRUST_PRESETS = ["observe", "code", "auto"] as const;
 
@@ -327,6 +328,10 @@ router.post("/auth/login", (req: Request, res: Response) => {
   const token = issueToken();
   res.json({ token });
 });
+
+// -- Diffs --------------------------------------------------------------------
+
+router.use(diffsRouter);
 
 // -- Error Handling Middleware ------------------------------------------------
 

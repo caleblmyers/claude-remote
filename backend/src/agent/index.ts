@@ -8,6 +8,7 @@ import {
   type SDKResultMessage,
   type SDKAssistantMessage,
 } from "@anthropic-ai/claude-code";
+import { execSync } from "child_process";
 import { v4 as uuidv4 } from "uuid";
 import * as db from "../db";
 import { saveTaskEvent } from "../db";
@@ -18,6 +19,44 @@ import {
   notifyTaskComplete,
   notifyTaskError,
 } from "../push";
+
+interface FileDiff {
+  path: string;
+  diff: string;
+  additions: number;
+  deletions: number;
+}
+
+function captureGitDiffs(cwd: string): FileDiff[] {
+  try {
+    const raw = execSync("git diff HEAD~1", { cwd, encoding: "utf-8", maxBuffer: 5 * 1024 * 1024 });
+    if (!raw.trim()) return [];
+
+    const fileDiffs: FileDiff[] = [];
+    // Split by "diff --git" to get per-file chunks
+    const chunks = raw.split(/^diff --git /m).filter(Boolean);
+
+    for (const chunk of chunks) {
+      const fullChunk = "diff --git " + chunk;
+      // Extract file path from "diff --git a/path b/path"
+      const pathMatch = chunk.match(/^a\/(.+?) b\//);
+      const filePath = pathMatch ? pathMatch[1] : "unknown";
+
+      let additions = 0;
+      let deletions = 0;
+      for (const line of fullChunk.split("\n")) {
+        if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+        if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+      }
+
+      fileDiffs.push({ path: filePath, diff: fullChunk, additions, deletions });
+    }
+
+    return fileDiffs;
+  } catch {
+    return [];
+  }
+}
 
 // Track running tasks for abort/stop support
 const runningTasks = new Map<string, AbortController>();
@@ -278,10 +317,20 @@ function processMessage(taskId: string, message: SDKMessage): void {
     const taskForNotify = db.getTask(taskId);
     const repo = taskForNotify?.repo ?? "";
 
+    // Capture git diffs on successful completion
+    let diffs: FileDiff[] = [];
+    if (!result.is_error && taskForNotify) {
+      const config = getConfig();
+      const repoConfig = config.repos.find((r) => r.name === taskForNotify.repo);
+      const cwd = repoConfig?.path ?? taskForNotify.repo;
+      diffs = captureGitDiffs(cwd);
+    }
+
     db.updateTask(taskId, {
       status: result.is_error ? "failed" : "completed",
       summary,
       ...(result.is_error ? { error: summary } : {}),
+      ...(diffs.length > 0 ? { diffs } : {}),
     });
     broadcast({
       type: result.is_error ? "task:error" : "task:complete",
