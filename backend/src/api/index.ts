@@ -7,6 +7,7 @@ import { issueToken, validateSetupCode } from "../auth";
 import { broadcast } from "../ws";
 import { getVapidPublicKey, isVapidConfigured, sendTestPush } from "../push";
 import diffsRouter from "./diffs";
+import activityRouter from "./activity";
 
 const VALID_TRUST_PRESETS = ["observe", "code", "auto"] as const;
 
@@ -73,6 +74,8 @@ router.post("/tasks", (req: Request, res: Response) => {
     trustLevel: trustLevel ?? defaultTrust,
   });
 
+  db.logActivity("task_created", task.id, { repo: task.repo });
+
   // Broadcast task creation
   broadcast({
     type: "task:created",
@@ -108,6 +111,7 @@ router.post("/tasks/:id/stop", (req: Request, res: Response) => {
     });
   }
 
+  db.logActivity("task_stopped", task.id, { repo: task.repo });
   res.json({ success: true });
 });
 
@@ -153,6 +157,7 @@ router.post("/tasks/:id/approve", (req: Request, res: Response) => {
   }
 
   db.resolvePermissionRequest(requestId, "approved");
+  db.logActivity("permission_approved", req.params.id, { tool: perm.tool });
   res.json({ success: true });
 });
 
@@ -167,6 +172,7 @@ router.post("/tasks/:id/deny", (req: Request, res: Response) => {
   }
 
   db.resolvePermissionRequest(requestId, "denied");
+  db.logActivity("permission_denied", req.params.id, { tool: perm.tool });
   res.json({ success: true });
 });
 
@@ -231,6 +237,7 @@ router.post("/tasks/:id/escalate", (req: Request, res: Response) => {
   trustLevel.alwaysAsk = trustLevel.alwaysAsk.filter((t) => t !== tool);
 
   db.updateTask(req.params.id, { trustLevel });
+  db.logActivity("trust_escalated", req.params.id, { tool });
   res.json({ success: true, trustLevel });
 });
 
@@ -305,6 +312,7 @@ router.put("/config", (req: Request, res: Response) => {
     delete updates.vapid;
 
     const updated = updateConfig(updates);
+    db.logActivity("config_updated", undefined, { keys: Object.keys(updates) });
     const { auth: _auth, vapid: _vapid, server: _server, ...safe } = updated;
     void _auth; void _vapid; void _server;
     res.json(safe);
@@ -322,16 +330,22 @@ router.post("/auth/login", (req: Request, res: Response) => {
   }
 
   if (!validateSetupCode(code)) {
+    db.logActivity("login_failed");
     return res.status(401).json({ error: "Invalid setup code" });
   }
 
   const token = issueToken();
+  db.logActivity("login");
   res.json({ token });
 });
 
 // -- Diffs --------------------------------------------------------------------
 
 router.use(diffsRouter);
+
+// -- Activity Log -------------------------------------------------------------
+
+router.use(activityRouter);
 
 // -- Error Handling Middleware ------------------------------------------------
 

@@ -40,6 +40,22 @@ export interface PermissionRequest {
   resolvedAt?: string;
 }
 
+export interface ActivityEntry {
+  id: number;
+  action: string;
+  taskId?: string;
+  detail?: Record<string, unknown>;
+  createdAt: string;
+}
+
+type ActivityRow = {
+  id: number;
+  action: string;
+  task_id: string | null;
+  detail: string | null;
+  created_at: string;
+};
+
 type TaskRow = {
   id: string;
   repo: string;
@@ -275,4 +291,32 @@ export function listPushSubscriptions(): PushSubscriptionRecord[] {
 
 export function deletePushSubscription(endpoint: string): void {
   getDb().prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").run(endpoint);
+}
+
+// ── Activity Log ─────────────────────────────────────────────────────────────
+
+function rowToActivityEntry(row: ActivityRow): ActivityEntry {
+  return {
+    id: row.id,
+    action: row.action,
+    taskId: row.task_id ?? undefined,
+    detail: row.detail ? JSON.parse(row.detail) : undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export function logActivity(action: string, taskId?: string, detail?: Record<string, unknown>): void {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO activity_log (action, task_id, detail, created_at)
+    VALUES (?, ?, ?, ?)
+  `).run(action, taskId ?? null, detail ? JSON.stringify(detail) : null, new Date().toISOString());
+}
+
+export function listActivityLog(limit = 50, offset = 0): ActivityEntry[] {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ? OFFSET ?"
+  ).all(limit, offset) as ActivityRow[];
+  return rows.map(rowToActivityEntry);
 }

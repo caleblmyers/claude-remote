@@ -54,6 +54,18 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   keys_auth    TEXT NOT NULL,
   created_at   TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS activity_log (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  action       TEXT NOT NULL
+                 CHECK (action IN ('login','login_failed','task_created','task_completed','task_failed','task_stopped','permission_approved','permission_denied','trust_escalated','config_updated')),
+  task_id      TEXT,
+  detail       TEXT,
+  created_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_log_task_id    ON activity_log(task_id);
 `;
 
 export function initSchema(db: Database.Database): void {

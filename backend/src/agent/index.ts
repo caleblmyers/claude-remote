@@ -11,7 +11,7 @@ import {
 import { execSync } from "child_process";
 import { v4 as uuidv4 } from "uuid";
 import * as db from "../db";
-import { saveTaskEvent } from "../db";
+import { saveTaskEvent, logActivity } from "../db";
 import { broadcast } from "../ws";
 import { getConfig } from "../config";
 import {
@@ -343,6 +343,13 @@ function processMessage(taskId: string, message: SDKMessage): void {
       oldStatus: "running",
       newStatus: result.is_error ? "failed" : "completed",
     });
+
+    // Log activity
+    if (result.is_error) {
+      logActivity("task_failed", taskId, { repo, error: summary });
+    } else {
+      logActivity("task_completed", taskId, { repo });
+    }
 
     // Send push notification
     if (result.is_error) {
