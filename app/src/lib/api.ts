@@ -72,6 +72,14 @@ export interface TaskEvent {
   createdAt: string;
 }
 
+export interface ActivityEntry {
+  id: number;
+  action: string;
+  taskId?: string;
+  detail?: Record<string, unknown>;
+  createdAt: string;
+}
+
 export const api = {
   tasks: {
     list: () => request<Task[]>("/tasks"),
@@ -145,6 +153,11 @@ export const api = {
         method: "DELETE",
         body: JSON.stringify({ endpoint }),
       }),
+  },
+
+  activity: {
+    list: (limit = 50, offset = 0) =>
+      request<ActivityEntry[]>(`/activity?limit=${limit}&offset=${offset}`),
   },
 
   escalate: (taskId: string, tool: string) =>

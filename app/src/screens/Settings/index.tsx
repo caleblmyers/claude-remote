@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../lib/api";
+import type { ActivityEntry } from "../../lib/api";
 import { useWebSocket } from "../../hooks/useWebSocket";
 import { useAuth } from "../../hooks/useAuth";
 import { TRUST_PRESETS } from "../../lib/types";
@@ -41,6 +42,12 @@ export default function SettingsScreen() {
   const [testingSend, setTestingSend] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
 
+  // Activity log state
+  const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityOffset, setActivityOffset] = useState(0);
+  const [hasMoreActivity, setHasMoreActivity] = useState(true);
+
   useEffect(() => {
     (async () => {
       try {
@@ -60,7 +67,31 @@ export default function SettingsScreen() {
       (s) => setVapidConfigured(s.configured),
       () => setVapidConfigured(false)
     );
+
+    // Load initial activity log
+    api.activity.list(20, 0).then(
+      (entries) => {
+        setActivityEntries(entries);
+        setHasMoreActivity(entries.length === 20);
+      },
+      () => {}
+    );
   }, []);
+
+  const loadMoreActivity = async () => {
+    setActivityLoading(true);
+    try {
+      const nextOffset = activityOffset + 20;
+      const entries = await api.activity.list(20, nextOffset);
+      setActivityEntries((prev) => [...prev, ...entries]);
+      setActivityOffset(nextOffset);
+      setHasMoreActivity(entries.length === 20);
+    } catch {
+      // ignore
+    } finally {
+      setActivityLoading(false);
+    }
+  };
 
   const requestNotifPermission = async () => {
     if (!pushSupported) return;
@@ -168,6 +199,34 @@ export default function SettingsScreen() {
   const handleLogout = () => {
     logout();
     navigate("/login", { replace: true });
+  };
+
+  const formatAction = (entry: ActivityEntry): string => {
+    const detail = entry.detail ?? {};
+    switch (entry.action) {
+      case "login": return "Login successful";
+      case "login_failed": return "Login failed";
+      case "task_created": return `Task created${detail.repo ? ` in ${detail.repo}` : ""}`;
+      case "task_completed": return `Task completed${detail.repo ? ` in ${detail.repo}` : ""}`;
+      case "task_failed": return `Task failed${detail.repo ? ` in ${detail.repo}` : ""}`;
+      case "task_stopped": return `Task stopped${detail.repo ? ` in ${detail.repo}` : ""}`;
+      case "permission_approved": return `Approved ${detail.tool ?? "tool"}${detail.repo ? ` on ${detail.repo}` : ""}`;
+      case "permission_denied": return `Denied ${detail.tool ?? "tool"}${detail.repo ? ` on ${detail.repo}` : ""}`;
+      case "trust_escalated": return `Escalated ${detail.tool ?? "tool"}`;
+      case "config_updated": return "Config updated";
+      default: return entry.action;
+    }
+  };
+
+  const timeAgo = (dateStr: string): string => {
+    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
   };
 
   return (
@@ -397,6 +456,48 @@ export default function SettingsScreen() {
                     </span>
                   )}
                 </div>
+              )}
+            </section>
+
+            {/* Activity Log */}
+            <section>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                Activity Log
+              </h2>
+              <div className="rounded-xl border border-gray-800 divide-y divide-gray-800 max-h-80 overflow-y-auto">
+                {activityEntries.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-600">No activity yet</div>
+                ) : (
+                  activityEntries.map((entry) => (
+                    <div key={entry.id} className="px-4 py-2.5 flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-sm text-gray-300 truncate">
+                          {formatAction(entry)}
+                        </div>
+                        {entry.taskId && (
+                          <button
+                            onClick={() => navigate(`/tasks/${entry.taskId}`)}
+                            className="text-xs text-indigo-400 hover:text-indigo-300"
+                          >
+                            View task
+                          </button>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-600 whitespace-nowrap shrink-0">
+                        {timeAgo(entry.createdAt)}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              {hasMoreActivity && activityEntries.length > 0 && (
+                <button
+                  onClick={loadMoreActivity}
+                  disabled={activityLoading}
+                  className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 disabled:opacity-50"
+                >
+                  {activityLoading ? "Loading..." : "Load more"}
+                </button>
               )}
             </section>
 
