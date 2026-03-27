@@ -57,6 +57,13 @@ export interface TaskWithPermissions extends Task {
   pendingPermissions?: import("./types").PermissionRequest[];
 }
 
+export interface FileDiff {
+  path: string;
+  diff: string;
+  additions: number;
+  deletions: number;
+}
+
 export interface TaskEvent {
   id: number;
   taskId: string;
@@ -86,6 +93,7 @@ export const api = {
         body: JSON.stringify({ message }),
       }),
     events: (id: string) => request<TaskEvent[]>(`/tasks/${id}/events`),
+    diffs: (id: string) => request<FileDiff[]>(`/tasks/${id}/diffs`),
     delete: (id: string) =>
       request<void>(`/tasks/${id}`, { method: "DELETE" }),
     approve: (taskId: string, requestId: string) =>

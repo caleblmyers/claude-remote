@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
-import type { TaskWithPermissions } from "../../lib/api";
+import type { TaskWithPermissions, FileDiff } from "../../lib/api";
 import type { TrustLevel } from "../../lib/types";
 import { useWebSocket } from "../../hooks/useWebSocket";
 import type {
@@ -21,6 +21,9 @@ export default function TaskDetailScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const outputRef = useRef<HTMLDivElement>(null);
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+  const [diffs, setDiffs] = useState<FileDiff[]>([]);
+  const [changesCollapsed, setChangesCollapsed] = useState(true);
+  const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
   const savedCountRef = useRef(0);
   const [eventsLoading, setEventsLoading] = useState(true);
 
@@ -30,6 +33,12 @@ export default function TaskDetailScreen() {
     setTaskLoading(true);
     api.tasks.get(id).then(setTask).catch(console.error).finally(() => setTaskLoading(false));
   }, [id]);
+
+  // Fetch diffs for completed tasks
+  useEffect(() => {
+    if (!id || !task || task.status !== "completed") return;
+    api.tasks.diffs(id).then(setDiffs).catch(() => setDiffs([]));
+  }, [id, task?.status]);
 
   // Load persisted events
   useEffect(() => {
@@ -332,6 +341,44 @@ export default function TaskDetailScreen() {
         )}
       </section>
 
+      {/* Changes (diff viewer) */}
+      {task.status === "completed" && diffs.length > 0 && (
+        <section
+          className="px-4 py-3 border-b border-gray-800 shrink-0 cursor-pointer"
+          onClick={() => setChangesCollapsed(!changesCollapsed)}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Changes ({diffs.length} file{diffs.length !== 1 ? "s" : ""},{" "}
+              +{diffs.reduce((s, d) => s + d.additions, 0)}{" "}
+              -{diffs.reduce((s, d) => s + d.deletions, 0)})
+            </h2>
+            <span className="text-xs text-gray-600">
+              {changesCollapsed ? "\u25BC" : "\u25B2"}
+            </span>
+          </div>
+          {!changesCollapsed && (
+            <div className="space-y-1 mt-2" onClick={(e) => e.stopPropagation()}>
+              {diffs.map((fileDiff, i) => (
+                <DiffFileEntry
+                  key={i}
+                  fileDiff={fileDiff}
+                  expanded={expandedFiles.has(i)}
+                  onToggle={() =>
+                    setExpandedFiles((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(i)) next.delete(i);
+                      else next.add(i);
+                      return next;
+                    })
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Inline approval cards */}
       {pendingPerms && pendingPerms.length > 0 && (
         <section className="px-4 py-3 border-b border-amber-800/50 bg-amber-950/20 shrink-0">
@@ -520,6 +567,50 @@ function formatToolInput(tool: string, input: Record<string, unknown>): string {
   const entries = Object.entries(input);
   if (entries.length === 0) return tool;
   return entries.map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("\n");
+}
+
+function DiffFileEntry({
+  fileDiff,
+  expanded,
+  onToggle,
+}: {
+  fileDiff: FileDiff;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full text-left text-sm font-mono py-1 px-2 rounded hover:bg-gray-800 transition-colors flex items-center gap-2"
+      >
+        <span className="text-gray-600 text-xs">{expanded ? "\u25BC" : "\u25B6"}</span>
+        <span className="text-emerald-400 text-xs">+{fileDiff.additions}</span>
+        <span className="text-red-400 text-xs">-{fileDiff.deletions}</span>
+        <span className="text-gray-300 truncate">{fileDiff.path}</span>
+      </button>
+      {expanded && (
+        <pre className="mt-1 mb-2 mx-2 p-2 bg-gray-900 rounded text-xs overflow-x-auto leading-relaxed">
+          {fileDiff.diff.split("\n").map((line, j) => (
+            <div
+              key={j}
+              className={
+                line.startsWith("+") && !line.startsWith("+++")
+                  ? "text-emerald-400"
+                  : line.startsWith("-") && !line.startsWith("---")
+                    ? "text-red-400"
+                    : line.startsWith("@@")
+                      ? "text-blue-400"
+                      : "text-gray-500"
+              }
+            >
+              {line}
+            </div>
+          ))}
+        </pre>
+      )}
+    </div>
+  );
 }
 
 function OutputEntry({ entry }: { entry: StreamEvent }) {
