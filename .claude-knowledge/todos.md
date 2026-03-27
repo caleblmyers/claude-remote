@@ -12,7 +12,82 @@
 
 ## Work Sets
 
-(No pending work sets — all moved to Completed or Post-MVP Backlog)
+### S6: Fix E2E Tests
+**Priority:** High — 19/37 tests failing, need to match actual UI
+**Status:** Pending
+**Files:**
+- `app/e2e/tests/login.spec.ts`
+- `app/e2e/tests/home.spec.ts`
+- `app/e2e/tests/new-task.spec.ts`
+- `app/e2e/tests/task-detail.spec.ts`
+- `app/e2e/tests/settings.spec.ts`
+- `app/e2e/tests/navigation.spec.ts`
+- `app/e2e/helpers.ts`
+- `app/e2e/mock-server.ts`
+
+**Items:**
+- [ ] Read each screen component to understand actual rendered text/elements, then fix selectors
+- [ ] Fix login error test: app shows "Connection failed" for 401 — either fix the app bug in `api.ts` (401 handler throws "Unauthorized" which doesn't include "401" for useAuth check) or update test
+- [ ] Fix state bleed: `resetState()` clears server but not browser localStorage — add `page.evaluate(() => localStorage.clear())` in helpers or beforeEach
+- [ ] Fix WS timing: tests that send events via control API need `page.waitForSelector` instead of `page.waitForTimeout`
+- [ ] Fix home screen tests: `fastLogin` + `seedTask` + `reload` pattern may race — ensure tasks are seeded before page loads
+- [ ] Fix new-task tests: all fail because `fastLogin` navigates to `/` then test navigates to `/new`, but resetState may not have repos ready
+- [ ] Run `pnpm test:e2e` and verify all 37 tests pass on both Mobile Chrome portrait + landscape
+
+### S7: Fix Login 401 Error Message
+**Priority:** Medium — minor UX bug found during e2e testing
+**Status:** Pending
+**Files:**
+- `app/src/lib/api.ts`
+- `app/src/hooks/useAuth.ts`
+
+**Items:**
+- [ ] Fix `request()` in api.ts: for `/auth/login` endpoint, don't trigger the global 401 handler (clearToken + redirect). Instead, let the error propagate with the status code so useAuth can show "Invalid setup code"
+- [ ] Alternatively, change useAuth to check for "Unauthorized" in the error message instead of "401"
+
+### S8: Session Resumption
+**Priority:** High — core Phase 2 feature
+**Status:** Pending
+**Files:**
+- `backend/src/agent/index.ts`
+- `backend/src/api/index.ts`
+- `app/src/screens/TaskDetail/index.tsx`
+- `app/src/lib/api.ts`
+
+**Items:**
+- [ ] Backend: use Agent SDK `resume` option to continue a session by sessionId
+- [ ] Backend: add `POST /tasks/:id/reply` handler that calls `replyToTask()` with session resumption
+- [ ] Frontend: on completed tasks with a sessionId, show a reply input to continue the conversation
+- [ ] Frontend: reply sends message, task status changes back to running, output resumes streaming
+
+### S9: CORS Restriction
+**Priority:** Medium — security improvement
+**Status:** Pending
+**Files:**
+- `backend/src/index.ts`
+
+**Items:**
+- [ ] Replace `Access-Control-Allow-Origin: *` with configurable allowed origins
+- [ ] Add `cors.allowedOrigins` field to config schema (defaults to `*` for dev)
+- [ ] In production, restrict to the actual Tailscale IP or hostname
+
+---
+
+## Parallelism Matrix
+
+Sets that can run in parallel (no file overlap):
+
+| | S6 | S7 | S8 | S9 |
+|---|---|---|---|---|
+| S6 | - | NO | NO | YES |
+| S7 | NO | - | NO | YES |
+| S8 | NO | NO | - | YES |
+| S9 | YES | YES | YES | - |
+
+**Notes:**
+- S6 and S7 overlap on `api.ts` and `useAuth.ts`
+- S6 and S8 overlap on `TaskDetail` and `api.ts`
+- S9 is fully independent (only touches `backend/src/index.ts`)
 
 ---
 
