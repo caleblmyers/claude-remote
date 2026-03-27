@@ -72,4 +72,11 @@ CREATE INDEX IF NOT EXISTS idx_activity_log_task_id    ON activity_log(task_id);
 
 export function initSchema(db: Database.Database): void {
   db.exec(SCHEMA_SQL);
+  // Migrate: add columns that may be missing from older databases
+  const migrations = [
+    "ALTER TABLE tasks ADD COLUMN diffs TEXT",
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch { /* column already exists */ }
+  }
 }
